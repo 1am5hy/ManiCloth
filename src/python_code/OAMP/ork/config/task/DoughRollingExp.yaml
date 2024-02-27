@@ -1,0 +1,8 @@
+name: DoughRollingExp
+
+env:
+  seed: 0
+  sdf_loss: -1.
+  density_loss: -10.
+  contact_loss: 1.
+  soft_contact_loss: True

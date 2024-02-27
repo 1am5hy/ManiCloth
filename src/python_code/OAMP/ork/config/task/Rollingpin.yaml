@@ -1,0 +1,14 @@
+name: Rollingpin
+
+env:
+  seed: 0
+  sdf_loss: 10.
+  density_loss: 10.
+  contact_loss: 1.
+  soft_contact_loss: True
+
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  motion_file: "/home/ubuntu/Github/ORK/ork/utils/runs/RollingpinParticleaction_2023-12-05-23-04-40/Rollingpin-Particle-v1_demo_data.json"
+  numAMPObsSteps: 2                  # The number of demonstration motion steps to be used as AMP observation
+

@@ -1,0 +1,17 @@
+name: ClothTable
+
+env:
+#  seed: 0
+#  sdf_loss: 10.
+#  density_loss: 10.
+#  contact_loss: 1.
+#  soft_contact_loss: True
+
+  stateInit: "Random"
+  hybridInitProb: 0.5
+  motion_file: "/home/ubuntu/Github/DiffCloth/src/python_code/real2sim/optitrack_data/npfiles/marker_path_dyndemo.npy"
+  numAMPObsSteps: 2        # The number of demonstration motion steps to be used as AMP observation
+  AMPHindsightTargetFlag: False       # Whether to use the AMP hindsight target
+  RandomInitialFlag: False           # Whether to use random initial state
+  RandomTargetFlag: False            # Whether to use random target state
+  UseTargetFlag: False            # Whether to use target state as amp observation

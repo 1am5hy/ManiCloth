@@ -1,0 +1,593 @@
+# Copyright 2023, Junjia LIU, jjliu@mae.cuhk.edu.hk
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import math
+from typing import Callable, Union, Tuple, Optional, List
+
+import gym
+from gym.spaces import Box
+import gymnasium
+import numpy as np
+import rofunc as rf
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from omegaconf import DictConfig
+from rofunc.learning.RofuncRL.agents.base_agent import BaseAgent
+from rofunc.learning.RofuncRL.models.actor_models import ActorPPO_Gaussian
+from rofunc.learning.RofuncRL.models.critic_models import Critic
+from rofunc.learning.RofuncRL.processors.schedulers import KLAdaptiveRL
+from rofunc.learning.RofuncRL.processors.standard_scaler import RunningStandardScaler
+from rofunc.learning.RofuncRL.processors.standard_scaler import empty_preprocessor
+from rofunc.learning.RofuncRL.utils.memory import Memory
+
+class ORKAgent(BaseAgent):
+    def __init__(self,
+                 cfg: DictConfig,
+                 observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space, List]],
+                 action_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]],
+                 memory: Optional[Union[Memory, Tuple[Memory]]] = None,
+                 device: Optional[Union[str, torch.device]] = None,
+                 experiment_dir: Optional[str] = None,
+                 rofunc_logger: Optional[rf.logger.BeautyLogger] = None,
+                 amp_observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None,
+                 motion_dataset: Optional[Union[Memory, Tuple[Memory]]] = None,
+                 replay_buffer: Optional[Union[Memory, Tuple[Memory]]] = None,
+                 collect_reference_motions: Optional[Callable[[int], torch.Tensor]] = None,
+                 target_observation_space: Optional[Union[int, Tuple[int], gym.Space, gymnasium.Space]] = None):
+        """
+        :param cfg: Configuration
+        :param observation_space: Observation space
+        :param action_space: Action space
+        :param memory: Memory for storing transitions
+        :param device: Device on which the torch tensor is allocated
+        :param experiment_dir: Directory where experiment outputs are saved
+        :param rofunc_logger: Rofunc logger
+        :param amp_observation_space: cfg["env"]["numAMPObsSteps"] * NUM_AMP_OBS_PER_STEP
+        :param motion_dataset: Demonstration motion dataset
+        :param replay_buffer: Replay buffer for collecting AMP observations in previous episodes to train discriminator
+        :param collect_reference_motions: Function for collecting reference demonstration motions to add to motion dataset
+        :param target_observation_space: Target observation space
+        """
+        super().__init__(cfg, observation_space, action_space, memory, device, experiment_dir, rofunc_logger)
+
+        self.amp_observation_space = amp_observation_space
+        self.target_observation_space = target_observation_space
+        self.motion_dataset = motion_dataset
+        self.replay_buffer = replay_buffer
+        self.collect_reference_motions = collect_reference_motions
+
+        '''Define models for ORK'''
+        self.policy = ActorPPO_Gaussian(cfg.Model, observation_space, action_space, self.se).to(self.device)
+        if self.cfg.Model.use_same_model:
+            self.value = self.policy
+        else:
+            self.value = Critic(cfg.Model, observation_space, action_space, self.se).to(self.device)
+
+        self.discriminator = Critic(cfg.Model, amp_observation_space, action_space, self.se,
+                                    cfg_name='discriminator').to(self.device)
+
+        amp_observation_space2 = Box(-np.inf, np.inf, (12,))
+        self.discriminator2 = Critic(cfg.Model, amp_observation_space2, action_space, self.se,
+                                     cfg_name='discriminator').to(self.device)
+
+        self.models = {"policy": self.policy, "value": self.value, "discriminator": self.discriminator}
+        self.models2 = {"policy": self.policy, "value": self.value, "discriminator2": self.discriminator2}
+
+        # checkpoint models
+        self.checkpoint_modules["policy"] = self.policy
+        self.checkpoint_modules["value"] = self.value
+        self.checkpoint_modules["discriminator"] = self.discriminator
+        self.checkpoint_modules["discriminator3"] = self.discriminator2
+        self.rofunc_logger.module(f"Policy model: {self.policy}")
+        self.rofunc_logger.module(f"Value model: {self.value}")
+        self.rofunc_logger.module(f"Discriminator model: {self.discriminator}")
+        self.rofunc_logger.module(f"Discriminator2 model: {self.discriminator2}")
+
+        '''Create tensors in memory'''
+        if hasattr(cfg.Model, "state_encoder"):
+            img_channel = int(self.cfg.Model.state_encoder.inp_channels)
+            img_size = int(self.cfg.Model.state_encoder.image_size)
+            state_tensor_size = (img_channel, img_size, img_size)
+            kd = True
+        else:
+            state_tensor_size = self.observation_space
+            kd = False
+        self.memory.create_tensor(name="states", size=state_tensor_size, dtype=torch.float32, keep_dimensions=kd)
+        self.memory.create_tensor(name="next_states", size=state_tensor_size, dtype=torch.float32, keep_dimensions=kd)
+        self.memory.create_tensor(name="target_states", size=self.target_observation_space, dtype=torch.float32, keep_dimensions=kd)
+        self.memory.create_tensor(name="actions", size=self.action_space, dtype=torch.float32)
+        self.memory.create_tensor(name="rewards", size=1, dtype=torch.float32)
+        self.memory.create_tensor(name="terminated", size=1, dtype=torch.bool)
+        self.memory.create_tensor(name="log_prob", size=1, dtype=torch.float32)
+        self.memory.create_tensor(name="values", size=1, dtype=torch.float32)
+        self.memory.create_tensor(name="returns", size=1, dtype=torch.float32)
+        self.memory.create_tensor(name="advantages", size=1, dtype=torch.float32)
+        self.memory.create_tensor(name="amp_states", size=amp_observation_space, dtype=torch.float32)
+        self.memory.create_tensor(name="next_values", size=1, dtype=torch.float32)
+        # tensors sampled during training
+        self._tensors_names = ["states", "actions", "rewards", "next_states", "terminated", "log_prob", "values",
+                               "returns", "advantages", "amp_states", "next_values", "target_states"]
+
+        '''Get hyper-parameters from config'''
+        self._discount = self.cfg.Agent.discount
+        self._td_lambda = self.cfg.Agent.td_lambda
+        self._learning_epochs = self.cfg.Agent.learning_epochs
+        self._mini_batch_size = self.cfg.Agent.mini_batch_size
+        self._amp_batch_size = self.cfg.Agent.amp_batch_size
+        self._task_reward_weight = self.cfg.Agent.task_reward_weight
+        self._style_reward_weight = self.cfg.Agent.style_reward_weight
+        self._lr_a = self.cfg.Agent.lr_a
+        self._lr_c = self.cfg.Agent.lr_c
+        self._lr_d = self.cfg.Agent.lr_d
+        self._lr_scheduler = self.cfg.get("Agent", {}).get("lr_scheduler", KLAdaptiveRL)
+        self._lr_scheduler_kwargs = self.cfg.get("Agent", {}).get("lr_scheduler_kwargs", {'kl_threshold': 0.008})
+        self._adam_eps = self.cfg.Agent.adam_eps
+        self._entropy_loss_scale = self.cfg.Agent.entropy_loss_scale
+        self._value_loss_scale = self.cfg.Agent.value_loss_scale
+        self._grad_norm_clip = self.cfg.Agent.grad_norm_clip
+        self._ratio_clip = self.cfg.Agent.ratio_clip
+        self._value_clip = self.cfg.Agent.value_clip
+        self._clip_predicted_values = self.cfg.Agent.clip_predicted_values
+        self._least_square_discriminator = self.cfg.Agent.least_square_discriminator
+        self._discriminator_loss_scale = self.cfg.Agent.discriminator_loss_scale
+        self._discriminator_batch_size = self.cfg.Agent.discriminator_batch_size
+        self._discriminator_reward_scale = self.cfg.Agent.discriminator_reward_scale
+        self._discriminator_logit_regularization_scale = self.cfg.Agent.discriminator_logit_regularization_scale
+        self._discriminator_gradient_penalty_scale = self.cfg.Agent.discriminator_gradient_penalty_scale
+        self._discriminator_weight_decay_scale = self.cfg.Agent.discriminator_weight_decay_scale
+        self._discriminator_AMPnOAMP = self.cfg.Agent.discriminator_AMPnOAMP
+        self._discriminator_AMP_weight = self.cfg.Agent.discriminator_AMP_weight
+        self._discriminator_OAMP_weight = self.cfg.Agent.discriminator_OAMP_weight
+        self._rewards_shaper = self.cfg.get("Agent", {}).get("rewards_shaper", lambda rewards: rewards * 0.01)
+        # self._state_preprocessor = RunningStandardScaler
+        # self._state_preprocessor_kwargs = self.cfg.get("Agent", {}).get("state_preprocessor_kwargs",
+        #                                                                 {"size": observation_space, "device": device})
+        self._value_preprocessor = RunningStandardScaler
+        self._value_preprocessor_kwargs = self.cfg.get("Agent", {}).get("value_preprocessor_kwargs",
+                                                                        {"size": 1, "device": device})
+        self._amp_state_preprocessor = None
+        # self._amp_state_preprocessor = RunningStandardScaler
+        # self._amp_state_preprocessor_kwargs = self.cfg.get("Agent", {}).get("amp_state_preprocessor_kwargs",
+        #                                                                     {"size": amp_observation_space,
+        #                                                                      "device": device})
+
+        '''Misc variables'''
+        self._current_log_prob = None
+        self._current_next_states = None
+        self._current_states = None
+
+        self._set_up()
+
+    def _set_up(self):
+        """
+        Set up optimizer, learning rate scheduler and state/value preprocessors
+        """
+        assert hasattr(self, "policy"), "Policy is not defined."
+        assert hasattr(self, "value"), "Value is not defined."
+
+        # Set up optimizer and learning rate scheduler
+        if self.policy is self.value:
+            self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=self._lr_a)
+            if self._lr_scheduler is not None:
+                self.scheduler = self._lr_scheduler(self.optimizer, **self._lr_scheduler_kwargs)
+            self.checkpoint_modules["optimizer"] = self.optimizer
+        else:
+            self.optimizer_policy = torch.optim.Adam(self.policy.parameters(), lr=self._lr_a, eps=self._adam_eps)
+            self.optimizer_value = torch.optim.Adam(self.value.parameters(), lr=self._lr_c, eps=self._adam_eps)
+            if self._lr_scheduler is not None:
+                self.scheduler_policy = self._lr_scheduler(self.optimizer_policy, **self._lr_scheduler_kwargs)
+                self.scheduler_value = self._lr_scheduler(self.optimizer_value, **self._lr_scheduler_kwargs)
+            self.checkpoint_modules["optimizer_policy"] = self.optimizer_policy
+            self.checkpoint_modules["optimizer_value"] = self.optimizer_value
+
+        self.optimizer_disc = torch.optim.Adam(self.discriminator.parameters(), lr=self._lr_d, eps=self._adam_eps)
+        self.optimizer_disc2 = torch.optim.Adam(self.discriminator2.parameters(), lr=self._lr_d, eps=self._adam_eps)
+
+        if self._lr_scheduler is not None:
+            self.scheduler_disc = self._lr_scheduler(self.optimizer_disc, **self._lr_scheduler_kwargs)
+            self.scheduler_disc2 = self._lr_scheduler(self.optimizer_disc2, **self._lr_scheduler_kwargs)
+        self.checkpoint_modules["optimizer_disc"] = self.optimizer_disc
+        self.checkpoint_modules["optimizer_disc2"] = self.optimizer_disc2
+
+        # set up preprocessors
+        super()._set_up()
+        if self._amp_state_preprocessor:
+            self._amp_state_preprocessor = self._amp_state_preprocessor(**self._amp_state_preprocessor_kwargs)
+            self.checkpoint_modules["amp_state_preprocessor"] = self._amp_state_preprocessor
+        else:
+            self._amp_state_preprocessor = empty_preprocessor
+
+        # Create tensors for motion dataset and replay buffer
+        self.motion_dataset.create_tensor(name="states", size=self.amp_observation_space, dtype=torch.float32)
+        self.replay_buffer.create_tensor(name="states", size=self.amp_observation_space, dtype=torch.float32)
+
+        # initialize motion dataset
+        for _ in range(math.ceil(self.motion_dataset.memory_size / self._amp_batch_size)):
+            self.motion_dataset.add_samples(states=self.collect_reference_motions(self._amp_batch_size))
+
+    def act(self, states: torch.Tensor, deterministic: bool = False):
+        if self._current_states is not None:
+            states = self._current_states
+
+        if not deterministic:
+            # sample stochastic actions
+            actions, log_prob = self.policy(self._state_preprocessor(states))
+            self._current_log_prob = log_prob
+        else:
+            # choose deterministic actions for evaluation
+            actions, _ = self.policy(self._state_preprocessor(states), deterministic=True)
+            log_prob = None
+        return actions, log_prob
+
+    def store_transition(self, states: torch.Tensor, actions: torch.Tensor, next_states: torch.Tensor,
+                         rewards: torch.Tensor, terminated: torch.Tensor, truncated: torch.Tensor, infos: torch.Tensor):
+        if self._current_states is not None:
+            states = self._current_states
+
+        super().store_transition(states=states, actions=actions, next_states=next_states, rewards=rewards,
+                                 terminated=terminated, truncated=truncated, infos=infos)
+
+        amp_states = infos["amp_obs"]
+        target_states = infos["target_obs"]
+
+        # reward shaping
+        if self._rewards_shaper is not None:
+            rewards = self._rewards_shaper(rewards)
+
+        # compute values
+        if self.cfg.Model.use_same_model:
+            values = self.value.get_value(self._state_preprocessor(states))
+        else:
+            values = self.value(self._state_preprocessor(states))
+        values = self._value_preprocessor(values, inverse=True)
+
+        if self.cfg.Model.use_same_model:
+            next_values = self.value.get_value(self._state_preprocessor(next_states))
+        else:
+            next_values = self.value(self._state_preprocessor(next_states))
+        next_values = self._value_preprocessor(next_values, inverse=True)
+        # storage transition in memory
+        self.memory.add_samples(states=states, actions=actions, rewards=rewards, next_states=next_states,
+                                terminated=terminated, truncated=truncated, log_prob=self._current_log_prob,
+                                values=values, amp_states=amp_states, next_values=next_values,
+                                target_states=target_states)
+
+    def update_net(self):
+        """
+        Update the network
+        """
+        # update dataset of reference motions
+        self.motion_dataset.add_samples(states=self.collect_reference_motions(self._amp_batch_size))
+
+        '''Compute combined rewards'''
+        rewards = self.memory.get_tensor_by_name("rewards")
+        amp_states = self.memory.get_tensor_by_name("amp_states")
+
+        if self._discriminator_AMPnOAMP == True:
+            amp_states2 = np.zeros([len(amp_states.clone().cpu()), len(amp_states.clone().cpu()[0]), 12])
+            for i in range(len(amp_states)):
+                amp_states2[i] = np.hstack([amp_states.clone().cpu()[i, :, 0:3], amp_states.clone().cpu()[i, :, 6:9], amp_states.clone().cpu()[i, :, 30:33], amp_states.clone().cpu()[i, :, 36:39]])
+                # amp_states2[i] = np.hstack([amp_states.clone().cpu()[i, :, 0:3], amp_states.clone().cpu()[i, :, 42:45],
+                #                             amp_states.clone().cpu()[i, :, 675:678],
+                #                             amp_states.clone().cpu()[i, :, 717:720]])
+                # amp_states2[i] = np.hstack([amp_states.clone().cpu()[i, :, :]])
+            amp_states2 = torch.tensor(amp_states2, device=self.device, dtype=torch.float32)
+
+        # amp_states2 = amp_states.clone()
+        # if self._discriminator_AMPnOAMP == True:
+        #     amp_states2 = torch.zeros_like(amp_states)
+        #     amp_states2[:, :, 0:3] = amp_states[:, :, 0:3]
+        #     amp_states2[:, :, 6:9] = amp_states[:, :, 6:9]
+        #     amp_states2[:, :, 30:33] = amp_states[:, :, 30:33]
+        #     amp_states2[:, :, 36:39] = amp_states[:, :, 36:39]
+
+
+        target_states = self.memory.get_tensor_by_name("target_states")
+
+        # amp_states = torch.cat([amp_states, target_states], dim=-1)
+        with torch.no_grad():
+            if self._discriminator_AMPnOAMP == True:
+                amp_logits = self._discriminator_OAMP_weight * self.discriminator(self._amp_state_preprocessor(amp_states)) + self._discriminator_AMP_weight * self.discriminator2(self._amp_state_preprocessor(amp_states2))
+            else:
+                amp_logits = self.discriminator(self._amp_state_preprocessor(amp_states))
+
+            if self._least_square_discriminator:
+                style_rewards = torch.maximum(torch.tensor(1 - 0.25 * torch.square(1 - amp_logits)),
+                                              torch.tensor(0.0001, device=self.device))
+            else:
+                style_rewards = -torch.log(torch.maximum(torch.tensor(1 - 1 / (1 + torch.exp(-amp_logits))),
+                                                         torch.tensor(0.0001, device=self.device)))
+            style_rewards *= self._discriminator_reward_scale
+
+        combined_rewards = self._task_reward_weight * rewards + self._style_reward_weight * style_rewards
+
+        '''Compute Generalized Advantage Estimator (GAE)'''
+        values = self.memory.get_tensor_by_name("values")
+        next_values = self.memory.get_tensor_by_name("next_values")
+
+        advantage = 0
+        advantages = torch.zeros_like(combined_rewards)
+        not_dones = self.memory.get_tensor_by_name("terminated").logical_not()
+        memory_size = combined_rewards.shape[0]
+
+        # advantages computation
+        for i in reversed(range(memory_size)):
+            advantage = combined_rewards[i] - values[i] + self._discount * (
+                    next_values[i] + self._td_lambda * not_dones[i] * advantage)
+            advantages[i] = advantage
+        # returns computation
+        values_target = advantages + values
+        # advantage normalization
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+        self.memory.set_tensor_by_name("values", self._value_preprocessor(values, train=True))
+        self.memory.set_tensor_by_name("returns", self._value_preprocessor(values_target, train=True))
+        self.memory.set_tensor_by_name("advantages", advantages)
+
+        '''Sample mini-batches from memory and update the network'''
+        sampled_batches = self.memory.sample_all(names=self._tensors_names, mini_batches=self._mini_batch_size)
+        sampled_motion_batches = self.motion_dataset.sample(names=["states"],
+                                                            batch_size=self.memory.memory_size * self.memory.num_envs,
+                                                            mini_batches=self._mini_batch_size)
+
+        if len(self.replay_buffer):
+            sampled_replay_batches = self.replay_buffer.sample(names=["states"],
+                                                               batch_size=self.memory.memory_size * self.memory.num_envs,
+                                                               mini_batches=self._mini_batch_size)
+        else:
+            sampled_replay_batches = [[batches[self._tensors_names.index("amp_states")]] for batches in sampled_batches]
+
+        cumulative_policy_loss = 0
+        cumulative_entropy_loss = 0
+        cumulative_value_loss = 0
+        cumulative_discriminator_loss = 0
+
+        # learning epochs
+        # Number of learning epochs? = 10
+        for epoch in range(self._learning_epochs):
+            # mini-batches loop
+            # Number of mini-batches?
+            for i, (sampled_states, sampled_actions, sampled_rewards, samples_next_states, samples_terminated,
+                    sampled_log_prob, sampled_values, sampled_returns, sampled_advantages, sampled_amp_states,
+                    _, target_states) in enumerate(sampled_batches):
+                sampled_states = self._state_preprocessor(sampled_states, train=True)
+                _, log_prob_now = self.policy(sampled_states, sampled_actions)
+
+                # compute entropy loss
+                entropy_loss = -self._entropy_loss_scale * self.policy.get_entropy().mean()
+
+                # compute policy loss
+                ratio = torch.exp(log_prob_now - sampled_log_prob)
+                surrogate = sampled_advantages * ratio
+                surrogate_clipped = sampled_advantages * torch.clip(ratio, 1.0 - self._ratio_clip,
+                                                                    1.0 + self._ratio_clip)
+
+                policy_loss = -torch.min(surrogate, surrogate_clipped).mean()
+
+                # compute value loss
+                if self.cfg.Model.use_same_model:
+                    predicted_values = self.value.get_value(sampled_states)
+                else:
+                    predicted_values = self.value(sampled_states)
+
+                if self._clip_predicted_values:
+                    predicted_values = sampled_values + torch.clip(predicted_values - sampled_values,
+                                                                   min=-self._value_clip,
+                                                                   max=self._value_clip)
+                value_loss = self._value_loss_scale * F.mse_loss(sampled_returns, predicted_values)
+
+                # compute discriminator loss
+                # sampled_amp_states = torch.cat([sampled_amp_states, target_states], dim=-1)
+                if self._discriminator_batch_size:
+                    sampled_amp_states_batch = self._amp_state_preprocessor(
+                        sampled_amp_states[0:self._discriminator_batch_size], train=True)
+                    sampled_amp_replay_states = self._amp_state_preprocessor(
+                        sampled_replay_batches[i][0][0:self._discriminator_batch_size], train=True)
+                    sampled_amp_motion_states = self._amp_state_preprocessor(
+                        sampled_motion_batches[i][0][0:self._discriminator_batch_size], train=True)
+                else:
+                    sampled_amp_states_batch = self._amp_state_preprocessor(sampled_amp_states, train=True)
+                    sampled_amp_replay_states = self._amp_state_preprocessor(sampled_replay_batches[i][0], train=True)
+                    sampled_amp_motion_states = self._amp_state_preprocessor(sampled_motion_batches[i][0], train=True)
+
+                sampled_amp_motion_states.requires_grad_(True)
+                amp_logits = self.discriminator(sampled_amp_states_batch)
+                amp_replay_logits = self.discriminator(sampled_amp_replay_states)
+                amp_motion_logits = self.discriminator(sampled_amp_motion_states)
+                amp_cat_logits = torch.cat([amp_logits, amp_replay_logits], dim=0)
+
+                if self._discriminator_AMPnOAMP == True:
+                    sampled_amp_states_batch2 = torch.hstack([sampled_amp_states_batch.clone()[:, 0:3], sampled_amp_states_batch.clone()[:, 6:9], sampled_amp_states_batch.clone()[:, 30:33], sampled_amp_states_batch.clone()[:, 36:39]])
+                    sampled_amp_replay_states2 = torch.hstack([sampled_amp_replay_states.clone()[:, 0:3], sampled_amp_replay_states.clone()[:, 6:9], sampled_amp_replay_states.clone()[:, 30:33], sampled_amp_replay_states.clone()[:, 36:39]])
+                    sampled_amp_motion_states2 = torch.hstack([sampled_amp_motion_states.clone()[:, 0:3], sampled_amp_motion_states.clone()[:, 6:9], sampled_amp_motion_states.clone()[:, 30:33], sampled_amp_motion_states.clone()[:, 36:39]])
+                    # sampled_amp_states_batch2 = torch.hstack(
+                    #     [sampled_amp_states_batch.clone()[:, 0:3], sampled_amp_states_batch.clone()[:, 42:45],
+                    #      sampled_amp_states_batch.clone()[:, 675:678], sampled_amp_states_batch.clone()[:, 717:720]])
+                    # sampled_amp_replay_states2 = torch.hstack(
+                    #     [sampled_amp_replay_states.clone()[:, 0:3], sampled_amp_replay_states.clone()[:, 42:45],
+                    #      sampled_amp_replay_states.clone()[:, 675:678], sampled_amp_replay_states.clone()[:, 717:720]])
+                    # sampled_amp_motion_states2 = torch.hstack(
+                    #     [sampled_amp_motion_states.clone()[:, 0:3], sampled_amp_motion_states.clone()[:, 42:45],
+                    #      sampled_amp_motion_states.clone()[:, 675:678], sampled_amp_motion_states.clone()[:, 717:720]])
+
+                # sampled_amp_states_batch2 = torch.hstack([sampled_amp_states_batch[:, :]])
+                # sampled_amp_replay_states2 = torch.hstack([sampled_amp_replay_states[:, :]])
+                # sampled_amp_motion_states2 = torch.hstack([sampled_amp_motion_states[:, :]])
+                # sampled_amp_motion_states2.requires_grad_(True)
+                #
+                # amp_states2 = np.zeros_like(amp_states.clone().cpu())
+                # for i in range(len(amp_states)):
+                #     amp_states2[i, :, 0:3] = amp_states.clone().cpu()[i, :, 0:3]
+                #     amp_states2[i, :, 6:9] = amp_states.clone().cpu()[i, :, 6:9]
+
+
+                    amp_logits2 = self.discriminator2(sampled_amp_states_batch2)
+                    amp_replay_logits2 = self.discriminator2(sampled_amp_replay_states2)
+                    amp_motion_logits2 = self.discriminator2(sampled_amp_motion_states2)
+                    amp_cat_logits2 = torch.cat([amp_logits2, amp_replay_logits2], dim=0)
+
+                # if self._discriminator_AMPnOAMP == True:
+                #     sampled_amp_states_batch2 = torch.zeros_like(sampled_amp_states_batch)
+                #     sampled_amp_states_batch2[:, 0:3] = sampled_amp_states_batch[:, 0:3]
+                #     sampled_amp_states_batch2[:, 6:9] = sampled_amp_states_batch[:, 6:9]
+                #     sampled_amp_states_batch2[:, 30:33] = sampled_amp_states_batch[:, 30:33]
+                #     sampled_amp_states_batch2[:, 36:39] = sampled_amp_states_batch[:, 36:39]
+                #
+                #     sampled_amp_replay_states2 = torch.zeros_like(sampled_amp_replay_states)
+                #     sampled_amp_replay_states2[:, 0:3] = sampled_amp_replay_states[:, 0:3]
+                #     sampled_amp_replay_states2[:, 6:9] = sampled_amp_replay_states[:, 6:9]
+                #     sampled_amp_replay_states2[:, 30:33] = sampled_amp_replay_states[:, 30:33]
+                #     sampled_amp_replay_states2[:, 36:39] = sampled_amp_replay_states[:, 36:39]
+                #
+                #     sampled_amp_motion_states2 = torch.zeros_like(sampled_amp_motion_states)
+                #     sampled_amp_motion_states2[:, 0:3] = sampled_amp_motion_states[:, 0:3]
+                #     sampled_amp_motion_states2[:, 6:9] = sampled_amp_motion_states[:, 6:9]
+                #     sampled_amp_motion_states2[:, 30:33] = sampled_amp_motion_states[:, 30:33]
+                #     sampled_amp_motion_states2[:, 36:39] = sampled_amp_motion_states[:, 36:39]
+                #
+                #     amp_logits2 = self.discriminator(sampled_amp_states_batch2)
+                #     amp_replay_logits2 = self.discriminator(sampled_amp_replay_states2)
+                #     amp_motion_logits2 = self.discriminator(sampled_amp_motion_states2)
+                #     amp_cat_logits2 = torch.cat([amp_logits2, amp_replay_logits2], dim=0)
+
+
+                # discriminator prediction loss
+                if self._least_square_discriminator:
+                    discriminator_loss = 0.5 * (
+                            F.mse_loss(amp_cat_logits, -torch.ones_like(amp_cat_logits), reduction='mean') \
+                            + F.mse_loss(amp_motion_logits, torch.ones_like(amp_motion_logits), reduction='mean'))
+                else:
+                    discriminator_loss = 0.5 * (nn.BCEWithLogitsLoss()(amp_cat_logits, torch.zeros_like(amp_cat_logits)) \
+                                                + nn.BCEWithLogitsLoss()(amp_motion_logits,
+                                                                         torch.ones_like(amp_motion_logits)))
+                    if self._discriminator_AMPnOAMP == True:
+                        discriminator_loss2 = 0.5 * (nn.BCEWithLogitsLoss()(amp_cat_logits2, torch.zeros_like(amp_cat_logits2)) \
+                                                     + nn.BCEWithLogitsLoss()(amp_motion_logits2, torch.ones_like(amp_motion_logits2)))
+                        discriminator_loss = self._discriminator_OAMP_weight * discriminator_loss + self._discriminator_AMP_weight * discriminator_loss2
+
+
+                # discriminator logit regularization
+                if self._discriminator_logit_regularization_scale:
+                    logit_weights = torch.flatten(list(self.discriminator.modules())[-1].weight)
+                    logit_weights2 = torch.flatten(list(self.discriminator2.modules())[-1].weight)
+
+                    if self._discriminator_AMPnOAMP == True:
+                        discriminator_loss += self._discriminator_logit_regularization_scale * torch.sum(
+                            torch.square(logit_weights)) + self._discriminator_logit_regularization_scale * torch.sum(
+                            torch.square(logit_weights2))
+                    else:
+                        discriminator_loss += self._discriminator_logit_regularization_scale * torch.sum(
+                            torch.square(logit_weights))
+
+                # discriminator gradient penalty
+                if self._discriminator_gradient_penalty_scale:
+                    amp_motion_gradient = torch.autograd.grad(amp_motion_logits,
+                                                              sampled_amp_motion_states,
+                                                              grad_outputs=torch.ones_like(amp_motion_logits),
+                                                              create_graph=True,
+                                                              retain_graph=True,
+                                                              only_inputs=True)
+                    gradient_penalty = torch.sum(torch.square(amp_motion_gradient[0]), dim=-1).mean()
+                    discriminator_loss += self._discriminator_gradient_penalty_scale * gradient_penalty
+
+                # discriminator weight decay
+                if self._discriminator_weight_decay_scale:
+                    weights = [torch.flatten(module.weight) for module in self.discriminator.modules() \
+                               if isinstance(module, torch.nn.Linear)]
+                    weight_decay = torch.sum(torch.square(torch.cat(weights, dim=-1)))
+                    weights2 = [torch.flatten(module.weight) for module in self.discriminator2.modules() \
+                               if isinstance(module, torch.nn.Linear)]
+                    weight_decay2 = torch.sum(torch.square(torch.cat(weights2, dim=-1)))
+
+                    if self._discriminator_AMPnOAMP == True:
+                        discriminator_loss += self._discriminator_weight_decay_scale * weight_decay + self._discriminator_weight_decay_scale * weight_decay2
+                    else:
+                        discriminator_loss += self._discriminator_weight_decay_scale * weight_decay
+
+                discriminator_loss *= self._discriminator_loss_scale
+
+                '''Update networks'''
+                if self.policy is self.value:
+                    # optimization step
+                    self.optimizer.zero_grad()
+                    (policy_loss + entropy_loss + value_loss).backward()
+                    if self._grad_norm_clip > 0:
+                        nn.utils.clip_grad_norm_(self.policy.parameters(), self._grad_norm_clip)
+                    self.optimizer.step()
+                else:
+                    # Update policy network
+                    self.optimizer_policy.zero_grad()
+                    (policy_loss + entropy_loss).backward()
+                    if self._grad_norm_clip > 0:
+                        nn.utils.clip_grad_norm_(self.policy.parameters(), self._grad_norm_clip)
+                    self.optimizer_policy.step()
+
+                    # Update value network
+                    self.optimizer_value.zero_grad()
+                    value_loss.backward()
+                    if self._grad_norm_clip > 0:
+                        nn.utils.clip_grad_norm_(self.value.parameters(), self._grad_norm_clip)
+                    self.optimizer_value.step()
+
+                # Update discriminator network
+                self.optimizer_disc.zero_grad()
+                self.optimizer_disc2.zero_grad()
+                discriminator_loss.backward()
+                if self._grad_norm_clip > 0:
+                    nn.utils.clip_grad_norm_(self.discriminator.parameters(), self._grad_norm_clip)
+                    nn.utils.clip_grad_norm_(self.discriminator2.parameters(), self._grad_norm_clip)
+                self.optimizer_disc.step()
+                self.optimizer_disc2.step()
+
+                # update cumulative losses
+                cumulative_policy_loss += policy_loss.item()
+                cumulative_value_loss += value_loss.item()
+                if self._entropy_loss_scale:
+                    cumulative_entropy_loss += entropy_loss.item()
+                cumulative_discriminator_loss += discriminator_loss.item()
+
+            # update learning rate
+            if self._lr_scheduler:
+                if self.policy is self.value:
+                    self.scheduler.step()
+                else:
+                    self.scheduler_policy.step()
+                    self.scheduler_value.step()
+                self.scheduler_disc.step()
+                self.scheduler_disc2.step()
+
+        # update AMP replay buffer
+        self.replay_buffer.add_samples(states=amp_states.view(-1, amp_states.shape[-1]))
+
+        # record data
+        self.track_data("Info / Combined rewards", combined_rewards.mean().cpu())
+        self.track_data("Info / Style rewards", style_rewards.mean().cpu())
+        self.track_data("Info / Task rewards", rewards.mean().cpu())
+
+        self.track_data("Loss / Policy loss", cumulative_policy_loss / (self._learning_epochs * self._mini_batch_size))
+        self.track_data("Loss / Value loss", cumulative_value_loss / (self._learning_epochs * self._mini_batch_size))
+        self.track_data("Loss / Discriminator loss",
+                        cumulative_discriminator_loss / (self._learning_epochs * self._mini_batch_size))
+        if self._entropy_loss_scale:
+            self.track_data("Loss / Entropy loss",
+                            cumulative_entropy_loss / (self._learning_epochs * self._mini_batch_size))
+        if self._lr_scheduler:
+            if self.policy is self.value:
+                self.track_data("Learning / Learning rate", self.scheduler.get_last_lr()[0])
+            else:
+                self.track_data("Learning / Learning rate (policy)", self.scheduler_policy.get_last_lr()[0])
+                self.track_data("Learning / Learning rate (value)", self.scheduler_value.get_last_lr()[0])
+            self.track_data("Learning / Learning rate (discriminator)", self.scheduler_disc.get_last_lr()[0])
+            self.track_data("Learning / Learning rate (discriminator2)", self.scheduler_disc2.get_last_lr()[0])
