@@ -252,7 +252,7 @@ PYBIND11_MODULE(diffcloth_py, m) {
           .def_readwrite("customAttachmentVertexIdx", &Simulation::SceneConfiguration::customAttachmentVertexIdx)
           .def_readwrite("trajectory", &Simulation::SceneConfiguration::trajectory)
           .def_readwrite("primitiveConfig", &Simulation::SceneConfiguration::primitiveConfig)
-//          .def
+//          .def_readwrite("primitiveCenter", &Simulation::SceneConfiguration::primitive)
           .def_readwrite("windConfig", &Simulation::SceneConfiguration::windConfig)
           .def_readwrite("camPos", &Simulation::SceneConfiguration::camPos)
           .def_readwrite("camFocusPos", &Simulation::SceneConfiguration::camFocusPos)
@@ -407,7 +407,7 @@ PYBIND11_MODULE(diffcloth_py, m) {
   // Simulation
   py::class_<Simulation>(m, "Simulation")
           .def_readonly("taskLossInfo", &Simulation::taskLossInfo)
-          .def_readonly("primitives", &Simulation::primitives)
+          .def_readwrite("primitives", &Simulation::primitives)
           .def_readonly("sceneConfig", &Simulation::sceneConfig)
           .def_readwrite("forwardRecords", &Simulation::forwardRecords)
           .def_readwrite("useCustomRLFixedPoint", &Simulation::useCustomRLFixedPoint)

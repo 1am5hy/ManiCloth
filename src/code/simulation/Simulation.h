@@ -265,8 +265,6 @@ public:
 
     };
 
-
-
     struct SceneConfiguration {
         FabricConfiguration fabric; // in SimulationConstant::fabricArrs
         Orientation orientation;
@@ -275,7 +273,7 @@ public:
         std::vector<std::pair<double, std::vector<int>>> customAttachmentVertexIdx; // outside loop: different sets; each element: startFrame x vIdx
         TrajectoryConfigs trajectory;
         PrimitiveConfiguration primitiveConfig;
-//        PrimitiveConfiguration primitiv
+//        Primitive primitive;
         WindConfig windConfig;
         Vec3d camPos;
         Vec3d camFocusPos;
@@ -487,7 +485,7 @@ public:
             plane3(Vec3d(-3.68522, 3.768829, 3.926864), Vec3d(-6.56042, 3.768829, 0.0349113), Vec3d(-0.79241, 3.768829, 0.0562581), COLOR_SKY),
 //            plane3(Vec3d(-4.18522, 3.768829, 3.926864), Vec3d(-7.06042, 3.768829, 0.0349113), Vec3d(-1.29241, 3.768829, 0.0562581), COLOR_SKY),
 //            plane3(Vec3d(-3.68522, 3.768829, 3.926864),  Vec3d(-100, -0.5, -100), Vec3d(100, -0.5, -100),  COLOR_SKY),
-//            plane4(Vec3d(-5.4781, 8.4761932, 2.614567), Vec3d(-5.4181, 8.4761932, 2.5155), Vec3d(-5.577237, 8.4761932, 2.549781), COLOR_SKY),
+//            plane4(Vec3d(-5.4781, 8.4761932, 2.6`14567), Vec3d(-5.4181, 8.4761932, 2.5155), Vec3d(-5.577237, 8.4761932, 2.549781), COLOR_SKY),
 //Table for real table _ high table
             plane4(Vec3d(-6.25949, 6.141073, 0.8672467), Vec3d(-9.16133, 6.141073, -3.06233), Vec3d(-3.39524, 6.141073, -3.12073), COLOR_SKY),
 //            plane4(Vec3d(-5.4781, 8.4761932, 2.614567), Vec3d(-10, 8.4761932, -10), Vec3d(10, 8.4761932, -10), COLOR_SKY),

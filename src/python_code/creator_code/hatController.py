@@ -1,17 +1,12 @@
 import diffcloth_py as diffcloth
-import numpy as np
-import time, math, random, scipy, utils, common, argparse, torch, os
+import math, random, utils, common, torch, os
 from pySim.pySim import pySim
 from pathlib import Path
-import scipy.optimize
 import numpy as np
-import matplotlib.pyplot as plt
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional
-from torch.optim import Adam, LBFGS
-from datetime import datetime
-from clothNN import Controller, IndClosedController
+from clothNN import IndClosedController
 
 
 def getX0A0PairsFromSphericalCoord(xzDegree, yDegree):
@@ -20,11 +15,10 @@ def getX0A0PairsFromSphericalCoord(xzDegree, yDegree):
     HEAD_CENTER_POS[1] = CLOTH_INIT_POS_CENTER[1]
     xzRad = xzDegree * math.pi / 180
     xmean_newPoint = utils.getPointOnSphere(dist, xzRad, math.radians(yDegree)) + HEAD_CENTER_POS
-    translation = (xmean_newPoint - CLOTH_INIT_POS_CENTER).reshape(1, 3)  # translation function, don't change the shape
-    translationMat = np.tile(translation, (vert_num, 1))  # translation function, don't change it
+    translation = (xmean_newPoint - CLOTH_INIT_POS_CENTER).reshape(1, 3)
+    translationMat = np.tile(translation, (vert_num, 1))
     x0_shifted = common.toTorchTensor(x0_mat + translationMat, False, False)
     a0_shifted = common.toTorchTensor(CLIP_INIT_POS + np.tile(translation, (1, ndof_u // 3)), True, False)
-
     return (x0_shifted, a0_shifted)
 
 
@@ -212,47 +206,30 @@ else:
     common.setRandomSeed(args.randSeed)
 
 # DiffSimulation Settings
-sim = diffcloth.makeSim("wind_cloth")
-sim.resetSystem()
-CLIP_INIT_POS = np.array(sim.getStateInfo().x_fixedpoints)
-# sim.sceneConfig.customAttachmentVertexIdx = [[0.0, [0, 0]]]
+sim = diffcloth.makeSim("wear_hat")
 sim.gradientClippingThreshold, sim.gradientClipping = 100.0, False
 np.set_printoptions(precision=5)
 
 root_path = Path(__file__).resolve().parent
 parent_path = root_path / 'experiments' / example
 exp_path = parent_path / expName
-diffcloth.enableOpenMP(n_threads=20)
+diffcloth.enableOpenMP(n_threads=50)
 helper = diffcloth.makeOptimizeHelper(example)
 # forwardConvergence needs to be reset after helper is made
-sim.forwardConvergenceThreshold = 1e-7
-
-# sim.sceneConfig.customAttachmentVertexIdx
-pySim = pySim(sim, helper, True)
+sim.forwardConvergenceThreshold = 1e-8
 
 sim.resetSystem()
+pySim = pySim(sim, helper, True)
 state_info_init = sim.getStateInfo()
-
-"""
-New Additions to the code
-"""
-
-
-
 ndof_u = sim.ndof_u
 x0, v0 = state_info_init.x, state_info_init.v
 vert_num = x0.shape[0] // 3
 x0_mat = x0.reshape((-1, 3))
-
-"""
-Remove the following items
-"""
-# CLIP_DIR_VERTEX_PAIR = [(1, 2), (3, 4)]
-# HEAD_CENTER_POS = sim.primitives[0].center.copy()
-# CLOTH_INIT_POS_CENTER = x0_mat.mean(axis=0)
-# frame, targetShape = helper.lossInfo.targetFrameShape[0]
-
-
+frame, targetShape = helper.lossInfo.targetFrameShape[0]
+CLIP_INIT_POS = np.array(sim.getStateInfo().x_fixedpoints)
+CLIP_DIR_VERTEX_PAIR = [(394, 562), (32, 108)]
+HEAD_CENTER_POS = sim.primitives[0].center.copy()
+CLOTH_INIT_POS_CENTER = x0_mat.mean(axis=0)
 
 x0_torch, v0_torch, a_torch, a0_torch, targetshape_torch, fxiedPointInitDist_torch, CLIP_REST_DIST = common.getTorchVectors(
     x0, v0, CLIP_INIT_POS, targetShape)
@@ -269,7 +246,7 @@ if not (eval_mode):
     # Train
     if not (train_resume):
         exp_path.mkdir(parents=True, exist_ok=True)
-        os.system("cp clothcontroller.py {}".format(exp_path / 'windcloth_nn_{}.py'.format(dt_string)))
+        os.system("cp hatController.py {}".format(exp_path / 'wearhat_nn_{}.py'.format(dt_string)))
         os.system("cp utils.py {}".format(exp_path / 'utils_{}.py'.format(dt_string)))
         os.system("cp closedLoop_common.py {}".format(exp_path / 'closedLoop_common_{}.py'.format(dt_string)))
         configFile = open(exp_path / "config.txt", "a")
