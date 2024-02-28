@@ -59,8 +59,8 @@ Agent:
 #  discriminator_gradient_penalty_scale: 2.5
   discriminator_weight_decay_scale: 0.0001
   discriminator_AMPnOAMP: True
-  discriminator_AMP_weight: 0.2
-  discriminator_OAMP_weight: 0.8
+  discriminator_AMP_weight: 0.4
+  discriminator_OAMP_weight: 0.6
 
   kl_threshold: 0                  # Initial coefficient for KL divergence.
 

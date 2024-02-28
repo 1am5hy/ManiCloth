@@ -80,7 +80,7 @@ class ClothRelease(gym.Env):
         # self._hist_amp_obs_buf = self._amp_obs_buf[:, 1:]  # History observations
 
         # self.target_obs = self._motion_lib.get_motion_state(0, int(self._motion_lib._motion_lengths[0] - 1))[0]
-        self.target_obs = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/np_files/hang_pose.npy")
+        self.target_obs = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/np_files/relative_hang_release.npy")
         self._target_obs_space = spaces.Box(np.ones(self._num_amp_target_obs) * -np.Inf,
                                             np.ones(self._num_amp_target_obs) * np.Inf)
 

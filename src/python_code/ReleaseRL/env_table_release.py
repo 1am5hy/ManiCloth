@@ -86,7 +86,7 @@ class cloth_env:
         state_info_init = self.sim.getStateInfo()
         self.action_space = Box(0, 100, (1,), dtype=int)
         # self.observation_space = Box(-np.inf, np.inf, (30,))
-        self.observation_space = Box(-np.inf, np.inf, (225,))
+        self.observation_space = Box(-np.inf, np.inf, (270,))
         self.interest1 = np.array(
             [0, 1, 2, 21, 22, 23, 42, 43, 44, 189, 190, 191, 360, 361, 362, 399, 400, 401, 519, 520, 521, 765, 766, 767,
              786, 787, 788, 807, 808, 809])
@@ -144,10 +144,10 @@ class cloth_env:
     def get_obs(self):
         observe = self.sim.getStateInfo().x
         obs = observe.flatten()[self.interest1]
-        # bar_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/bar_pos_test1.npy")
+        table_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/table_low_pos.npy")
         # # print(bar_pos)
         # print(obs.shape)
-        # obs = bar_pos - obs
+        obs = table_pos - obs
         # obs = self.sim.getStateInfo().x
         return obs
 
@@ -169,6 +169,8 @@ class cloth_env:
         y_value = np.array(y_value)
         min_y_obs = np.min(y_value)
         # print(min_y_obs)
+        if min_y_obs < 0:
+            min_y_obs = 0
 
         # loss = min_y_obs - min_y_pose
         loss = min_y_obs
@@ -192,9 +194,8 @@ class cloth_env:
         initialize
         """
         # To set up the action range
-        # print(action)
         action = 50 + action
-        action = int(action) + 50
+        action = int(action)
         # If the cloth is release in the first half of the manipulation, set a minimum start time for the policy to start its release
 
         self.scene.stepNum = action
@@ -216,7 +217,7 @@ class cloth_env:
 
         self.sim.resetSystem()
         self.scene.customAttachmentVertexIdx = [(0, [])]
-        self.scene.stepNum = 150
+        self.scene.stepNum = 200
         self.sim = dfc.makeSimFromConf(self.scene)
 
         self.sim_mod = pySim(self.sim, self.helper, True)
@@ -225,7 +226,8 @@ class cloth_env:
         self.paramInfo.v0 = self.v
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
 
-        self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 2978.19, 0.78])]))
+        gp = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
+        self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 3139.41, 0.57])]))
         self.x = self.x[-1]
         self.v = self.v[-1]
 

@@ -17,7 +17,7 @@ def train(custom_args):
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
@@ -43,7 +43,7 @@ def inference(custom_args):
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument("--sim_device", type=int, default=0)
     parser.add_argument("--rl_device", type=int, default=0)
     parser.add_argument("--inference", action="store_true", help="turn to inference mode while adding this argument")
-    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/runs/RofuncRL_PPOTrainer_TableClothRelease_24-02-26_08-10-48-740823/checkpoints/best_ckpt.pth")
+    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/runs/RofuncRL_PPOTrainer_TableClothRelease_24-02-28_03-36-04-420245/checkpoints/best_ckpt.pth")
     custom_args = parser.parse_args()
 
     if not custom_args.inference:

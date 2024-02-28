@@ -33,6 +33,7 @@ def get_default_scene():
     # scene.customAttachmentVertexIdx = [(0.0, [1838])]
     scene.trajectory = dfc.TrajectoryConfigs.PER_STEP_TRAJECTORY
     scene.primitiveConfig = dfc.PrimitiveConfiguration.BIG_SPHERE
+    # scene.primitiveConfig = dfc.Primitive
     scene.windConfig = dfc.WindConfig.NO_WIND
     # scene.camPos = np.array([-90, 30, 60])
     # scene.camPos = np.array([-21.67, 12.40, -10.67])
@@ -162,6 +163,7 @@ def run_sim_visualize(step_num):
     pos9 = torch.tensor(position_control[:, 9])
 
     db_pos = torch.cat((pos0, pos1, pos2, pos3, pos4, pos5, pos6, pos7, pos8, pos9), dim=1)
+
     x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos, helper)
 
     return x, v
@@ -170,8 +172,8 @@ def run_result(step_num):
     scene = get_default_scene()
     scene.customAttachmentVertexIdx = [(0, [0, 14])]
     scene.stepNum = step_num
+    # dfc.Primitive.center = np.array([100, 100, 100])
     sim = dfc.makeSimFromConf(scene)
-
 
     sim.gradientClippingThreshold, sim.gradientClipping = 100.0, True
     np.set_printoptions(precision=5)
@@ -202,7 +204,6 @@ def run_result(step_num):
     pos1 = torch.tensor(position_control[:, 3:])
 
     db_pos = torch.cat((pos0, pos1), dim=1)
-
     x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos, helper)
     x_sim = np.zeros([step_num, 225, 3])
 

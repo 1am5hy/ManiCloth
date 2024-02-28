@@ -195,16 +195,17 @@ def run_result(step_num):
 
     # position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/lqtcontrol/table_lqt.npy')
     position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_table_task.npy')
+    print(len(position_control))
 
-    if len(position_control) > step_num:
-        position_control = position_control[:step_num]
+    # if len(position_control) > step_num:
+    #     position_control = position_control[:step_num]
 
     pos0 = torch.tensor(position_control[:, :3])
     pos1 = torch.tensor(position_control[:, 3:])
 
     db_pos = torch.cat((pos0, pos1), dim=1)
 
-    x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos, helper)
+    x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos[:step_num], helper)
 
     x_sim = np.zeros([step_num, 270, 3])
 
@@ -215,7 +216,7 @@ def run_result(step_num):
     # mark = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/demo/dyn_sim_obs.npy")
     markers_traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_3.npy")
 
-    markers_traj = torch.tensor(markers_traj[:150]).float()
+    markers_traj = torch.tensor(markers_traj[:step_num]).float()
     x = x_sim.copy()
 
     markers = upsample(markers_traj, x)
@@ -233,9 +234,9 @@ def run_result(step_num):
     loss = 1 * torch.nn.functional.mse_loss(markers, x_sim, reduction='sum')
     print(loss)
 
+    sim.resetSystem()
     scene.customAttachmentVertexIdx = [(0, [])]
     scene.stepNum = 150
-    # scene.s
     sim = dfc.makeSimFromConf(scene)
 
     sim.gradientClippingThreshold, sim.gradientClipping = 100.0, False
@@ -246,7 +247,7 @@ def run_result(step_num):
     sim.forwardConvergenceThreshold = 1e-8
     sim.backwardConvergenceThreshold = 5e-8
 
-    sim.resetSystem()
+    # sim.resetSystem()
     paramInfo = dfc.ParamInfo()
     x = x[-1]
     v = v[-1]
@@ -255,7 +256,8 @@ def run_result(step_num):
     paramInfo.v0 = v.flatten()
     sim.resetSystemWithParams(helper.taskInfo, paramInfo)
 
-    x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos, helper)
+    print(len(db_pos))
+    x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos[:150], helper)
 
     return x, v
 
@@ -345,7 +347,7 @@ def run_sim_target(step_num, array):
 
 if __name__=="__main__":
     # array = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_30.npy")
-    x, v = run_result(150)
+    x, v = run_result(110)
     # x, v = run_sim_visualize(150)
     # x, v = run_sim_target(450, array[0])
 

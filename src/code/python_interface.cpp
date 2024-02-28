@@ -252,6 +252,7 @@ PYBIND11_MODULE(diffcloth_py, m) {
           .def_readwrite("customAttachmentVertexIdx", &Simulation::SceneConfiguration::customAttachmentVertexIdx)
           .def_readwrite("trajectory", &Simulation::SceneConfiguration::trajectory)
           .def_readwrite("primitiveConfig", &Simulation::SceneConfiguration::primitiveConfig)
+//          .def
           .def_readwrite("windConfig", &Simulation::SceneConfiguration::windConfig)
           .def_readwrite("camPos", &Simulation::SceneConfiguration::camPos)
           .def_readwrite("camFocusPos", &Simulation::SceneConfiguration::camFocusPos)

@@ -108,7 +108,7 @@ class cloth_env:
 
         if self.reset_clock != 0:
             self.action_save = np.array(self.action_save)
-            np.save("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/exp_txt_files/hang_inference_test_2.npy", self.action_save)
+            np.save("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_28_2.npy", self.action_save)
             print(self.action_save.shape)
         #     print(self.example.shape)
         #     print(self.example)
@@ -142,16 +142,13 @@ class cloth_env:
         observe = self.sim.getStateInfo().x
         obs = observe[self.interest1]
         bar_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/bar_pos.npy")
-        # print(bar_pos)
         obs = bar_pos - obs
-        # print(type(obs))
-        # obs = self.sim.getStateInfo().x
+
         return obs
 
     def get_rew(self, obs):
         traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_obs_30.npy", allow_pickle=True)
 
-        # Include IOU and include the distance between AMP and current
         loss = 0
         rew = 0
 
@@ -165,9 +162,6 @@ class cloth_env:
             loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
             rew = 1/loss
 
-        # obs = obs.clone().detach().numpy()
-        # loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
-        # rew = 1/loss
 
         return rew, loss
 
@@ -179,12 +173,11 @@ class cloth_env:
         gp_loc = torch.tensor([*self.gp1_loc, *self.gp2_loc])
         new_loc = gp_loc + action
 
-        # self.action_save.append(new_loc.clone().detach().numpy())
+        self.action_save.append(new_loc.clone().detach().numpy())
 
         # gp = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
-        # print(gp[0])
-        #
         # self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp[self.reset_clock]))
+
         self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), new_loc)
         self.gp1_loc = self.x[0:3]
         self.gp2_loc = self.x[42:45]
@@ -204,12 +197,6 @@ class cloth_env:
             self.render = True
             terminated = True
 
-        self.render_clock = self.render_clock + 1
-        if self.render_clock == 6000:
-            # self.render = True
-            terminated = True
-
-        # print(self.render)
         if self.render == True:
             dfc.render(self.sim, renderPosPairs=True, autoExit=True)
 

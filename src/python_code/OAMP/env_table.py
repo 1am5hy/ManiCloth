@@ -114,10 +114,10 @@ class cloth_env:
         # print(sum(self.loss)/55)
         # self.loss = []
         #
-        # if self.reset_clock != 0:
-        #      # self.action_save = np.array(self.action_save)
-        #      # np.save("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/exp_txt_files/table_task_inference_actual.npy", self.action_save)
-        #      # print(self.action_save.shape)
+        if self.reset_clock != 0:
+             self.action_save = np.array(self.action_save)
+             np.save("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/table_task_inference_28_2.npy", self.action_save)
+             print(self.action_save.shape)
         #     print(self.example.shape)
         #     print(self.example)
         #     np.save("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_obs_30.npy", self.example)
@@ -183,8 +183,8 @@ class cloth_env:
         gp_loc = torch.tensor([*self.gp1_loc, *self.gp2_loc])
         new_loc = gp_loc + action
 
-        # self.action_save.append(new_loc.clone().detach().numpy())
-        #
+        self.action_save.append(new_loc.clone().detach().numpy())
+
         # gp = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_table_task.npy')
         # self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp[self.reset_clock]))
         #
@@ -197,7 +197,7 @@ class cloth_env:
 
         observe = self.x
         obs = self.get_obs()
-        self.example[self.reset_clock] = observe[self.interest1]
+        # self.example[self.reset_clock] = observe[self.interest1]
 
         reward, loss = self.get_rew(observe)
         info = {'loss': loss, 'succeed': terminated, 'reward': reward}

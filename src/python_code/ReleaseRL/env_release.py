@@ -142,10 +142,10 @@ class cloth_env:
     def get_obs(self):
         observe = self.sim.getStateInfo().x
         obs = observe.flatten()[self.interest1]
-        # bar_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/bar_pos_test1.npy")
+        bar_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/bar_pos.npy")
         # # print(bar_pos)
         # print(obs.shape)
-        # obs = bar_pos - obs
+        obs = bar_pos - obs
         # obs = self.sim.getStateInfo().x
         return obs
 
@@ -188,17 +188,18 @@ class cloth_env:
         """
         # To set up the action range
         action = 50 + action
-        action = int(action) + 50 - 1
+        action = int(action) + 50
 
+        print(action)
         self.scene.stepNum = action
         self.sim = dfc.makeSimFromConf(self.scene)
         self.sim_mod = pySim(self.sim, self.helper, True)
         self.paramInfo = dfc.ParamInfo()
-        x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
+        x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
         self.paramInfo.x0 = x.flatten()
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
 
-        gp = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
+        gp = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_28_2.npy')
         # gp = gp[:action]
         self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 689.16, 0.09])]))
 
@@ -218,6 +219,7 @@ class cloth_env:
         self.paramInfo.v0 = self.v
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
 
+        gp = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
         self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 689.16, 0.09])]))
         self.x = self.x[-1]
         self.v = self.v[-1]

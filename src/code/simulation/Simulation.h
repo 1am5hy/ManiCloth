@@ -275,6 +275,7 @@ public:
         std::vector<std::pair<double, std::vector<int>>> customAttachmentVertexIdx; // outside loop: different sets; each element: startFrame x vIdx
         TrajectoryConfigs trajectory;
         PrimitiveConfiguration primitiveConfig;
+//        PrimitiveConfiguration primitiv
         WindConfig windConfig;
         Vec3d camPos;
         Vec3d camFocusPos;
