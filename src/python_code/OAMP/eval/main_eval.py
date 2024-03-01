@@ -10,7 +10,8 @@ from src.python_code.OAMP.ork.trainers import trainer_map
 # from task import ClothHangTask
 from rofunc.learning.utils.utils import set_seed
 from src.python_code.OAMP.task import ClothHangTask
-from src.python_code.OAMP.env import cloth_env
+from src.python_code.OAMP.eval.env_eval import cloth_env
+import hydra
 
 
 def train(custom_args):
@@ -39,16 +40,16 @@ def train(custom_args):
     trainer.train()
 
 
-def inference(custom_args):
+def inference(custom_args, eval_offset, render):
     args_overrides = ["task={}".format(custom_args.task),
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
-    env = cloth_env()
+    env = cloth_env(eval_offset, render)
     # env.seed(cfg.train.Trainer.seed)
     env = ClothHangTask(cfg=omegaconf_to_dict(cfg.task),
                         sim_device=f'cuda:{cfg.device_id}',
@@ -62,6 +63,13 @@ def inference(custom_args):
 
     trainer.agent.load_ckpt(custom_args.ckpt_path)
     trainer.inference()
+    x, v = trainer.env.cloth_env.eval_obs()
+
+    new_x, new_v = trainer.env.cloth_env.simulate_fall(x, v)
+
+    hydra.core.global_hydra.GlobalHydra.instance().clear()
+
+    return new_x, new_v
 
 
 if __name__ == '__main__':
@@ -77,11 +85,11 @@ if __name__ == '__main__':
     parser.add_argument("--inference", action="store_false", help="turn to inference mode while adding this argument")
     parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/runs/RofuncRL_ORKTrainer_ClothHang_24-02-27_09-53-01-768486/checkpoints/best_ckpt.pth")
     custom_args = parser.parse_args()
-
-    if not custom_args.inference:
-        train(custom_args)
-    else:
-        inference(custom_args)
+    #
+    # if not custom_args.inference:
+    #     train(custom_args)
+    # else:
+    #     inference(custom_args)
 
     # Tested Policy
     # RofuncRL_ORKTrainer_ClothHang_24-02-05_08-38-33-660375

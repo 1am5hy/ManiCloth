@@ -174,7 +174,7 @@ def run_result(step_num):
     scene.stepNum = step_num
     # dfc.Primitive.center = np.array([100, 100, 100])
     sim = dfc.makeSimFromConf(scene)
-    sim.primitives[0].center = np.array([100, 100, 100])
+    # sim.primitives[0].center = np.array([100, 100, 100])
     # dfc.Primitive.primitives.type
 
     sim.gradientClippingThreshold, sim.gradientClipping = 100.0, True

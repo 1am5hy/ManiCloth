@@ -20,7 +20,7 @@ import rofunc as rf
 import torch
 from gym import spaces
 
-from ork.tasks.motion_lib import MotionLib
+from src.python_code.OAMP.ork.tasks.motion_lib import MotionLib
 from gym.spaces import Box
 
 class ClothHangTask(gym.Env):

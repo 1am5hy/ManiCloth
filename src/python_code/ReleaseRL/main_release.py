@@ -73,8 +73,8 @@ if __name__ == '__main__':
     parser.add_argument("--mode", type=str, default="Particle")  # Available modes: Particle, Image, Graph
     parser.add_argument("--sim_device", type=int, default=0)
     parser.add_argument("--rl_device", type=int, default=0)
-    parser.add_argument("--inference", action="store_true", help="turn to inference mode while adding this argument")
-    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/runs/RofuncRL_PPOTrainer_ClothRelease_24-02-28_05-30-28-485218/checkpoints/best_ckpt.pth")
+    parser.add_argument("--inference", action="store_false", help="turn to inference mode while adding this argument")
+    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/runs/RofuncRL_PPOTrainer_ClothRelease_24-02-28_08-39-46-887216/checkpoints/best_ckpt.pth")
     custom_args = parser.parse_args()
 
     if not custom_args.inference:

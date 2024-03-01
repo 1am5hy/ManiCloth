@@ -160,7 +160,6 @@ class cloth_env:
         # y_value = np.array(y_value)
         # min_y_pose = np.min(y_value)
         # print(min_y_pose)
-
         obs = obs.clone().detach().numpy()
 
         y_value = []
@@ -172,18 +171,22 @@ class cloth_env:
         if min_y_obs < 0:
             min_y_obs = 0
 
-        # loss = min_y_obs - min_y_pose
-        loss = min_y_obs
+        on_bar_loss = min_y_obs
+
+        obs_center = obs[int(len(obs)/2)]
+
+        loss = np.array([-3.68522, 3.768829, 3.926864]) - obs_center
+        print(1 / loss)
 
         # Normalize time to range 0 to 1
         time = (150 - time) / 150
 
-        rew = loss + time
+        rew = 1 / loss + on_bar_loss + time
 
         # rew = (1 / loss) + 0.001 * (150 - time)
 
         print("Reward")
-        print(loss)
+        print(on_bar_loss)
         print(time)
         print(rew)
 
@@ -210,7 +213,7 @@ class cloth_env:
         # gp = gp[:action]
         self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 3139.41, 0.57])]))
 
-        # dfc.render(self.sim, renderPosPairs=True, autoExit=True)
+        dfc.render(self.sim, renderPosPairs=True, autoExit=True)
 
         self.x = self.x[-1].flatten()
         self.v = self.v[-1].flatten()
@@ -245,7 +248,7 @@ class cloth_env:
 
         self.reset_clock = self.reset_clock + 1
         if self.reset_clock == 1:
-            # self.render = True
+            self.render = True
             terminated = True
 
         # print(self.render)

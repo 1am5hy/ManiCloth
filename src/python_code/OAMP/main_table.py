@@ -75,7 +75,7 @@ if __name__ == '__main__':
     parser.add_argument("--sim_device", type=int, default=0)
     parser.add_argument("--rl_device", type=int, default=0)
     parser.add_argument("--inference", action="store_false", help="turn to inference mode while adding this argument")
-    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/runs/RofuncRL_ORKTrainer_ClothTable_24-02-27_07-55-34-433111/checkpoints/best_ckpt.pth")
+    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/runs/RofuncRL_ORKTrainer_ClothTable_24-02-28_06-09-20-996811/checkpoints/best_ckpt.pth")
     custom_args = parser.parse_args()
     #
     if not custom_args.inference:

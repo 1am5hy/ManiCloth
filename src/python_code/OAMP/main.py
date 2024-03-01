@@ -4,13 +4,13 @@ import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 from rofunc.config.utils import omegaconf_to_dict, get_config
 
-from ork.trainers import trainer_map
+from src.python_code.OAMP.ork.trainers import trainer_map
 # from ork.utils.env_utils import make_env
 # from ork.tasks.dough_deformation import DoughDeformationTask
-from task import ClothHangTask
+# from task import ClothHangTask
 from rofunc.learning.utils.utils import set_seed
-from task import ClothHangTask
-from env import cloth_env
+from src.python_code.OAMP.task import ClothHangTask
+from src.python_code.OAMP.env import cloth_env
 
 
 def train(custom_args):
