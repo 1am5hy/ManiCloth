@@ -2,6 +2,7 @@ from src.python_code.OAMP.eval.main_eval import inference
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 parser = argparse.ArgumentParser()
 # DoughRolling, DoughCutting, DoughGathering, DoughShaping
@@ -19,7 +20,7 @@ custom_args = parser.parse_args()
 # new = inference(custom_args, np.array([10, 12, 13]))
 # print(new)
 
-exploration_steps = 10
+exploration_steps = 500
 
 init_bar_pose = np.array([-5.29989, 6.811906, -0.285244])
 bar_pose = []
@@ -31,7 +32,14 @@ random = np.random.rand(exploration_steps, 3) * 20
 random = random - 10
 random = random + bar_pose
 
-print(random)
+# print(random)
+
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+#
+# ax.set_xlabel('X-axis')
+# ax.set_ylabel('Z-axis')
+# ax.set_zlabel('Y-axis')
 
 bar_pos = []
 fall = []
@@ -62,8 +70,19 @@ for i in range(exploration_steps):
     print("Bar Position is", random[i])
     print("Currently at step: ", i)
 
+    # ax.scatter(-5.29989, -0.285244, 6.811906, c='b', marker='o')
+    #
+    # if fall[i] == True:
+    #     ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='r', marker='o')
+    # else:
+    #     ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='g', marker='o')
+    #
+    # plt.show(block=False)
+    # plt.pause(3)
+    # plt.close()
+
 """
-Plot the graph
+Save the graph
 """
 
 fig = plt.figure()
@@ -83,5 +102,8 @@ ax.set_xlabel('X-axis')
 ax.set_ylabel('Z-axis')
 ax.set_zlabel('Y-axis')
 
+plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot_500.png')
 plt.show()
-plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot.png')
+
+# import pickle
+# pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
