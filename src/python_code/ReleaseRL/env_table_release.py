@@ -167,26 +167,28 @@ class cloth_env:
             y_value.append(obs[i, 1])
         y_value = np.array(y_value)
         min_y_obs = np.min(y_value)
-        # print(min_y_obs)
-        if min_y_obs < 0:
-            min_y_obs = 0
 
-        on_bar_loss = min_y_obs
+        if min_y_obs < 0:
+            on_table_loss = 0
+        else:
+            on_table_loss = 1
+
+        # on_table_loss = min_y_obs
 
         obs_center = obs[int(len(obs)/2)]
 
-        loss = np.array([-3.68522, 3.768829, 3.926864]) - obs_center
+        loss = np.mean(np.array([-3.68522, 3.768829, 3.926864]) - obs_center)
         print(1 / loss)
 
         # Normalize time to range 0 to 1
         time = (150 - time) / 150
 
-        rew = 1 / loss + on_bar_loss + time
+        rew = 1 / loss + on_table_loss + time
 
         # rew = (1 / loss) + 0.001 * (150 - time)
 
         print("Reward")
-        print(on_bar_loss)
+        print(on_table_loss)
         print(time)
         print(rew)
 
@@ -198,7 +200,7 @@ class cloth_env:
         """
         # To set up the action range
         action = 50 + action
-        action = int(action)
+        action = 50 + int(action)
         # If the cloth is release in the first half of the manipulation, set a minimum start time for the policy to start its release
 
         self.scene.stepNum = action

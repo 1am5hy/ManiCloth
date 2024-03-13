@@ -18,7 +18,7 @@ def train(custom_args):
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
@@ -44,7 +44,7 @@ def inference(custom_args):
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
@@ -74,8 +74,8 @@ if __name__ == '__main__':
     parser.add_argument("--mode", type=str, default="Particle")  # Available modes: Particle, Image, Graph
     parser.add_argument("--sim_device", type=int, default=0)
     parser.add_argument("--rl_device", type=int, default=0)
-    parser.add_argument("--inference", action="store_false", help="turn to inference mode while adding this argument")
-    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/runs/RofuncRL_ORKTrainer_ClothHang_24-02-27_09-53-01-768486/checkpoints/best_ckpt.pth")
+    parser.add_argument("--inference", action="store_true", help="turn to inference mode while adding this argument")
+    parser.add_argument("--ckpt_path", type=str, default="/home/ubuntu/Github/ManiCloth/src/python_code/OAMP/runs/RofuncRL_ORKTrainer_ClothHang_24-03-12_14-26-19-110857/checkpoints/best_ckpt.pth")
     custom_args = parser.parse_args()
 
     if not custom_args.inference:

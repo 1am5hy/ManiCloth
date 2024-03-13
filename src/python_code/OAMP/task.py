@@ -28,15 +28,15 @@ class ClothHangTask(gym.Env):
         self.cfg = cfg
         self.device = sim_device
         # self.observation_space = Box(-np.inf, np.inf, (675,))
-        self.observation_space = Box(-np.inf, np.inf, (30 ,))
+        self.observation_space = Box(-np.inf, np.inf, (60 ,))
         # self.observation_space = Box(-np.inf, np.inf, (6,))
         self.action_space = Box(-1, 1, (6,))
 
         self._num_amp_obs_steps = cfg["env"]["numAMPObsSteps"]
-        self._num_amp_obs_per_step = 30   # Observed particles + tool pose
+        self._num_amp_obs_per_step = 60   # Observed particles + tool pose
         # self._num_amp_obs_per_step = 6
         # self._num_amp_obs_per_step = 675
-        self._num_amp_target_obs = 30  # Target particle states size
+        self._num_amp_target_obs = 60  # Target particle states size
         # self._num_amp_target_obs = 6
         # self._num_amp_target_obs = 675
         self._amp_hindsight_target_flag = cfg["env"][
@@ -55,7 +55,7 @@ class ClothHangTask(gym.Env):
         # motion_file = "/home/ubuntu/Github/DiffCloth/src/python_code/real2sim/optitrack_data/npfiles/marker_path_dyndemo.npy"
         # motion_file = "/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/obs_hang.npy"
         # motion_file = "/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_30.npy"
-        motion_file = "/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/relative_marker_hang_task_30.npy"
+        motion_file = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/relative_marker_hang_task_60.npy"
         # motion_file = "/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_hang.npy"
         # print(np.load(motion_file).shape)
         # new = np.load(motion_file).reshape(len(np.load(motion_file)), -1)

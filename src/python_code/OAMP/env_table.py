@@ -12,6 +12,7 @@ import diffcloth_py as dfc
 import random
 
 from src.python_code.pySim.pySim_table import pySim
+from src.python_code.OAMP.utils.randomizer import random_reset
 
 class cloth_env:
     def __init__(self):
@@ -86,7 +87,7 @@ class cloth_env:
         state_info_init = self.sim.getStateInfo()
         self.action_space = Box(-1, 1, (6,))
         # self.observation_space = Box(-np.inf, np.inf, (30,))
-        self.observation_space = Box(-np.inf, np.inf, (30,))
+        self.observation_space = Box(-np.inf, np.inf, (60,))
         # self.interest1 = np.array(
         #     [0, 1, 2, 21, 22, 23, 42, 43, 44, 330, 331, 332, 405, 406, 407, 489, 490, 491, 654, 655, 656, 900, 901, 902,
         #      921, 922, 923, 942, 943, 944])
@@ -103,6 +104,7 @@ class cloth_env:
         self.action_save = []
         self.weight = 0.5
         self.example = np.zeros([150, 30])
+        self.opti_step = 0
 
     def reset(self):
         print("reset")
@@ -127,9 +129,11 @@ class cloth_env:
         self.sim_mod = pySim(self.sim, self.helper, True)
 
         self.paramInfo = dfc.ParamInfo()
-        x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_table_task.npy')
-        self.paramInfo.x0 = x.flatten()
-        # self.paramInfo.v0 = np.zeros_like(x).flatten()\
+        x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_init_table_task.npy')
+        x_new = random_reset(x)
+
+        self.paramInfo.x0 = x_new.flatten()
+        self.paramInfo.v0 = np.zeros_like(x).flatten()
 
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
         self.sim.gradientClipping = False
@@ -148,14 +152,15 @@ class cloth_env:
     def get_obs(self):
         observe = self.sim.getStateInfo().x
         obs = observe[self.interest1]
-        bar_pos = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/table_low_pos.npy")
+        obs = np.hstack([obs, obs])
+        bar_pos = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/table_pos_60.npy")
         # print(bar_pos)
         obs = bar_pos - obs
         # obs = self.sim.getStateInfo().x
         return obs
 
     def get_rew(self, obs):
-        traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_obs_30.npy", allow_pickle=True)
+        traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_table_task_obs_30.npy", allow_pickle=True)
 
         # print(traj[self.reset_clock])
         # Include IOU and include the distance between AMP and current
@@ -180,6 +185,18 @@ class cloth_env:
         """
         action = action * 0.5
 
+        # Velocity Limit
+        if self.opti_step > 250000:
+            action_1 = action[:3]
+            action_2 = action[3:]
+
+            if np.linalg.norm(action_1) > 1.4:
+                action_1 = action_1 / np.linalg.norm(action_1) * 1.4
+
+            if np.linalg.norm(action_2) > 1.4:
+                action_2 = action_2 / np.linalg.norm(action_2) * 1.4
+            action = np.hstack([action_1, action_2])
+
         gp_loc = torch.tensor([*self.gp1_loc, *self.gp2_loc])
         new_loc = gp_loc + action
 
@@ -203,6 +220,7 @@ class cloth_env:
         info = {'loss': loss, 'succeed': terminated, 'reward': reward}
         #
         self.reset_clock = self.reset_clock + 1
+        self.opti_step = self.opti_step + 1
         if self.reset_clock == 150:
             # self.render = True
             terminated = True

@@ -17,7 +17,7 @@ def train(custom_args):
                       "train={}{}{}".format(custom_args.task, custom_args.mode, custom_args.agent),
                       "device_id={}".format(custom_args.sim_device),
                       "rl_device=cuda:{}".format(custom_args.rl_device)]
-    cfg = get_config(absl_config_path='/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/ork/config',
+    cfg = get_config(absl_config_path='/home/ubuntu/Github/ManiCloth/src/python_code/ReleaseRL/ork/config',
                      config_name='config', args=args_overrides)
     set_seed(cfg.train.Trainer.seed)
 
@@ -86,3 +86,7 @@ if __name__ == '__main__':
     # RofuncRL_PPOTrainer_ClothRelease_24-02-23_11-10-09-945038
     # Cloth Release - Inference ver
     # RofuncRL_PPOTrainer_ClothRelease_24-02-28_05-30-28-485218
+    # RofuncRL_PPOTrainer_ClothRelease_24-02-28_08-39-46-887216
+
+    # Cloth Release - 1000 steps
+

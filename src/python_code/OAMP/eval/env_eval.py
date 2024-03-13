@@ -91,10 +91,8 @@ class cloth_env:
         self.action_save = []
         self.example = np.zeros([150, 30])
 
-        eval = []
-        for i in range(int(len(self.x)/3)):
-            eval.append(eval_offset)
-        self.eval_offset = np.array(eval)
+
+        self.eval_offset = np.array(eval_offset)
 
         self.render = render
 
@@ -121,7 +119,19 @@ class cloth_env:
         self.sim_mod = pySim(self.sim, self.helper, True)
 
         self.paramInfo = dfc.ParamInfo()
-        x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_hang.npy') + self.eval_offset
+        x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
+        # print(x.shape)
+        x1 = x[0]
+        x2 = x[14]
+        x_mid = np.mean([x1, x2])
+        offset = self.eval_offset - x_mid
+
+        eval = []
+        for i in range(int(len(self.x)/3)):
+            eval.append(offset)
+        eval = np.array(eval)
+        x = x + eval
+
         self.paramInfo.x0 = x.flatten()
         # self.paramInfo.v0 = np.zeros_like(x).flatten()\
 

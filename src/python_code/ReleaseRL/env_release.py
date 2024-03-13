@@ -199,7 +199,7 @@ class cloth_env:
         self.paramInfo.x0 = x.flatten()
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
 
-        gp = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_28_2.npy')
+        gp = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
         # gp = gp[:action]
         self.x, self.v = self.sim_mod(torch.tensor(self.x), torch.tensor(self.v), torch.tensor(gp), torch.tensor([([1, 10, 689.16, 0.09])]))
 
@@ -237,7 +237,7 @@ class cloth_env:
         info = {'loss': loss, 'succeed': terminated, 'reward': reward}
 
         self.reset_clock = self.reset_clock + 1
-        if self.reset_clock == 1:
+        if self.reset_clock == 10:
             self.render = True
             terminated = True
 
@@ -246,7 +246,6 @@ class cloth_env:
             dfc.render(self.sim, renderPosPairs=True, autoExit=True)
 
         # info = {'succeed': terminated, 'reward': reward}
-
 
         return obs, reward, terminated, info
 

@@ -27,7 +27,7 @@ void RenderLoop::renderRecordsForSystem(Simulation *system, std::vector<Simulati
 
     viewer.splineVisualization = true;
     viewer.perStepGradientVisualization = true;
-    viewer.renderAxis = false;
+    viewer.renderAxis = true;
     viewer.simulationInfoTextBox->setValue(text);
 
     clothShader = new Shader("clothVS", "clothFS");

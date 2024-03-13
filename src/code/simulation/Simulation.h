@@ -466,9 +466,12 @@ public:
             rightUpperArm(Vec3d(0, 0, 0), 1, 10, Vec3d(0, 1, 0), Vec3d(1, 0, 0)),
 
             leftLowerArm(Vec3d(5, 5, 0), 0.15, 10, Vec3d(0, 1, 0), Vec3d(-1, 0, 0)),
-//            rightLowerArm(Vec3d(-5, 2, 2), 0.15, 10, Vec3d(0, 1, 0), Vec3d(1, 0, 0)),
+//            Training pose
             rightLowerArm(Vec3d(-5.29989, 6.811906, -0.285244), 0.22272, 7, Vec3d(0, 1, 0), Vec3d(0, 0, 1)),
-//            rightLowerArm(Vec3d(-6.493591, 6.0611565, -0.3863256), 0.22272, 7, Vec3d(0, 1, 0), Vec3d(0, 0, 1)),
+//          Inference pose 1
+//            rightLowerArm(Vec3d(-4.873591, 7.0411565, -0.2696326), 0.22272, 7, Vec3d(0, 1, 0), Vec3d(0.01778431, -0.00291851, 0.99983759)),
+//          Inference pose 2
+//            rightLowerArm(Vec3d(-3.893591, 7.0981565, 0.2083674), 0.22272, 7, Vec3d(0, 1, 0), Vec3d(-0.34292087, -0.00287866, 0.93935988)),
 
             body(Vec3d(0, 0, 0), 2, 3.3, Vec3d(0, 1, 0), Vec3d(0, 1, 0)),
             neck(Vec3d(0, 0, 0), 0.6, 0.5, Vec3d(0, 1, 0), Vec3d(0, 1, 0)),

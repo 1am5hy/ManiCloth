@@ -20,7 +20,7 @@ custom_args = parser.parse_args()
 # new = inference(custom_args, np.array([10, 12, 13]))
 # print(new)
 
-exploration_steps = 500
+exploration_steps = 100
 
 init_bar_pose = np.array([-5.29989, 6.811906, -0.285244])
 bar_pose = []
@@ -31,15 +31,6 @@ bar_pose = np.array(bar_pose)
 random = np.random.rand(exploration_steps, 3) * 20
 random = random - 10
 random = random + bar_pose
-
-# print(random)
-
-# fig = plt.figure()
-# ax = fig.add_subplot(111, projection='3d')
-#
-# ax.set_xlabel('X-axis')
-# ax.set_ylabel('Z-axis')
-# ax.set_zlabel('Y-axis')
 
 bar_pos = []
 fall = []
@@ -85,25 +76,65 @@ for i in range(exploration_steps):
 Save the graph
 """
 
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+#
+# for i in range(exploration_steps):
+#     # Init point of the bar
+#     ax.scatter(-5.29989, -0.285244, 6.811906, c='b', marker='o')
+#
+#     if fall[i] == True:
+#         ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='r', marker='o')
+#     else:
+#         ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='g', marker='o')
+#
+#
+# ax.set_xlabel('X-axis')
+# ax.set_ylabel('Z-axis')
+# ax.set_zlabel('Y-axis')
+#
+# plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot_100_new.png')
+# plt.show()
+
 fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
+
+init_bar_pose = np.array([-5.29989, 6.811906, -0.285244])
+
+xy_succeed = []
+zy_succeed = []
+
+xy_fail = []
+zy_fail = []
 
 for i in range(exploration_steps):
-    # Init point of the bar
-    ax.scatter(-5.29989, -0.285244, 6.811906, c='b', marker='o')
-
     if fall[i] == True:
-        ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='r', marker='o')
+        xy_fail.append(bar_pos[i][:2])
+        zy_fail.append(np.array([bar_pos[i][2], bar_pos[i][1]]))
     else:
-        ax.scatter(bar_pos[i][0], bar_pos[i][2], bar_pos[i][1], c='g', marker='o')
+        xy_succeed.append(bar_pos[i][:2])
+        zy_succeed.append(np.array([bar_pos[i][2], bar_pos[i][1]]))
 
+xy_succeed = np.array(xy_succeed)
+zy_succeed = np.array(zy_succeed)
+xy_fail = np.array(xy_fail)
+zy_fail = np.array(zy_fail)
 
-ax.set_xlabel('X-axis')
-ax.set_ylabel('Z-axis')
-ax.set_zlabel('Y-axis')
-
-plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot_500.png')
+plt.scatter(init_bar_pose[0], init_bar_pose[1], color='b', label='Initial')
+plt.scatter(xy_succeed[:, 0], xy_succeed[:, 1], color='g', label='Success')
+plt.scatter(xy_fail[:, 0], xy_fail[:, 1], color='r', label='Fail')
+plt.legend()
+plt.xlabel('X-axis')
+plt.ylabel('Y-axis')
+plt.title('X-Y Plane')
+plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot_100_XY.png')
 plt.show()
 
-# import pickle
-# pickle.dump(fig, open('FigureObject.fig.pickle', 'wb'))
+plt.scatter(init_bar_pose[2], init_bar_pose[1], color='b', label='Initial')
+plt.scatter(zy_succeed[:, 0], zy_succeed[:, 1], color='g', label='Success')
+plt.scatter(zy_fail[:, 0], zy_fail[:, 1], color='r', label='Fail')
+plt.legend()
+plt.xlabel('Z-axis')
+plt.ylabel('Y-axis')
+plt.title('Z-Y Plane')
+plt.savefig('/home/ubuntu/Github/ManiCloth/src/python_code/eval/eval_graphs/inference_plot_100_ZY.png')
+plt.show()

@@ -1,6 +1,6 @@
 import numpy as np
 
-data = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/exp_txt_files/hang_inference_test.npy", allow_pickle=True)[:, :3]/10
+data = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_11_3_no_2.npy", allow_pickle=True)[:, :3]/10
 
 x = data[:, 0]
 y = data[:, 1]
