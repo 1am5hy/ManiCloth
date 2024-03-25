@@ -87,8 +87,8 @@ class cloth_env:
         state_info_init = self.sim.getStateInfo()
         self.action_space = Box(-1, 1, (6,))
         # self.observation_space = Box(-np.inf, np.inf, (30,))
-        self.observation_space = Box(-np.inf, np.inf, (60,))
-        self.interest1 = np.array([0, 1, 2, 21, 22, 23, 42, 43, 44, 147, 148, 149, 270, 271, 272, 312, 313, 314, 432, 433, 434, 630, 631, 632, 651, 652, 653, 672, 673, 674])
+        self.observation_space = Box(-np.inf, np.inf, (30,))
+        self.interest1 = np.array([0, 1, 2, 21, 22, 23, 42, 43, 44, 150, 151, 152, 273, 274, 275, 312, 313, 314, 435, 436, 437, 630, 631, 632, 651, 652, 653, 672, 673, 674])
         self.interest2 = np.array([0, 1, 2, 42, 43, 44])
         self.render = False
         self.loss = 0
@@ -96,7 +96,9 @@ class cloth_env:
         # self.similiarity = []
         # self.loss = []
         self.example = np.zeros([150, 30])
-        self.opti_step = 0
+        self.episode = 0
+        # self.rew = 0
+        # self.act_rew = 0
 
     def reset(self):
         # print("reset")
@@ -107,31 +109,33 @@ class cloth_env:
 
         # print(sum(self.loss)/55)
         # self.loss = []
-        #
-        # if self.reset_clock != 0:
-        #     self.action_save = np.array(self.action_save)
-        #     np.save("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_11_3_no_2.npy", self.action_save)
-        #     print(self.action_save.shape)
+
+        if self.reset_clock != 0:
+            self.action_save = np.array(self.action_save)
+            np.save("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_19_3_test.npy", self.action_save)
+            # print(self.action_save.shape)
         # #     print(self.example.shape)
         #     print(self.example)
         #     np.save("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_obs_30.npy", self.example)
 
+        self.episode = self.episode + 1
         self.reset_clock = 0
         self.sim = dfc.makeSimFromConf(self.scene)
         self.sim_mod = pySim(self.sim, self.helper, True)
 
         self.paramInfo = dfc.ParamInfo()
-        random_angle = random.uniform(-1/4 * math.pi, 1/4 * math.pi)
-
 
         x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
         # for i in range()
-        x_new = random_reset(x)
+        x_new = random_reset(x, plot=False, angle=-0.3500261433323031, translate=np.array([-0.16861055, 0.2871107, -1.27474583]))
+        # x_new = random_reset(x, plot=False, angle=0, translate=np.array([0, 0, 0]))
+        # x_new = random_reset(x, plot=False, angle=False, translate=False)
 
+        if self.episode == 5:
+            x_new = x
+            self.episode = 0
 
         self.paramInfo.x0 = x_new.flatten()
-        self.paramInfo.v0 = np.zeros_like(x).flatten()
-
         self.sim.resetSystemWithParams(self.helper.taskInfo, self.paramInfo)
         self.sim.gradientClipping = True
         self.sim.gradientClippingThreshold = 100.0
@@ -150,16 +154,16 @@ class cloth_env:
     def get_obs(self):
         observe = self.sim.getStateInfo().x
         obs = observe[self.interest1]
-        obs = np.hstack([obs, obs])
+        # obs = np.hstack([obs, obs])
         # print(obs.shape)
-        bar_pos = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/bar_pos_60.npy")
+        bar_pos = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/bar_pos.npy")
         # print(bar_pos)
         obs = bar_pos - obs
 
         return obs
 
-    def get_rew(self, obs):
-        traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_hang_task_obs_30.npy", allow_pickle=True)
+    def get_rew(self, obs, action):
+        traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_hang_task_30_2.npy", allow_pickle=True)
 
         loss = 0
         rew = 0
@@ -168,12 +172,17 @@ class cloth_env:
             obs = obs.clone().detach().numpy()
             loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
             rew = 1/loss
-        #
-        # if 75 > self.reset_clock > 65:
-        #     obs = obs.clone().detach().numpy()
-        #     loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
-        #     rew = 1/loss
 
+        if 75 > self.reset_clock > 65:
+            obs = obs.clone().detach().numpy()
+            loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
+            rew = 1/loss
+
+        act_rew_1 = 1.4 - np.linalg.norm(action[:3])
+        act_rew_2 = 1.4 - np.linalg.norm(action[3:6])
+        act_rew = act_rew_1 + act_rew_2
+
+        # rew = rew + (0.0025) * act_rew
 
         return rew, loss
 
@@ -183,18 +192,13 @@ class cloth_env:
         """
         action = action * 0.5
 
-        # Velocity Limit
-        if self.opti_step > 250000:
-            action_1 = action[:3]
-            action_2 = action[3:]
+        # Only During Inference
+        vel_limit = 1.5 * 0.025
 
-            if np.linalg.norm(action_1) > 1.4:
-                action_1 = action_1/np.linalg.norm(action_1) * 1.4
-
-            if np.linalg.norm(action_2) > 1.4:
-                action_2 = action_2/np.linalg.norm(action_2) * 1.4
-            action = np.hstack([action_1, action_2])
-
+        if np.linalg.norm(action[0:3]) > vel_limit:
+            action[0:3] = action[0:3]/np.linalg.norm(action[0:3]) * 0.2
+        if np.linalg.norm(action[3:6]) > vel_limit:
+            action[3:6] = action[3:6]/np.linalg.norm(action[3:6]) * 0.2
 
         gp_loc = torch.tensor([*self.gp1_loc, *self.gp2_loc])
         new_loc = gp_loc + action
@@ -215,13 +219,13 @@ class cloth_env:
         obs = self.get_obs()
         # self.example[self.reset_clock] = observe[self.interest1]
         # obs = self.sim.getStateInfo().x
-        reward, loss = self.get_rew(observe)
+        reward, loss = self.get_rew(observe, action)
         info = {'loss': loss, 'succeed': terminated, 'reward': reward}
 
         self.reset_clock = self.reset_clock + 1
-        self.opti_step = self.opti_step + 1
+
         if self.reset_clock == 150:
-            # self.render = True
+            self.render = True
             terminated = True
 
         if self.render == True:

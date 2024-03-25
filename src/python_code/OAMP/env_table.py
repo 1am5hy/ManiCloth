@@ -130,7 +130,7 @@ class cloth_env:
 
         self.paramInfo = dfc.ParamInfo()
         x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_init_table_task.npy')
-        x_new = random_reset(x)
+        x_new = random_reset(x, plot=False, angle=False, translate=False)
 
         self.paramInfo.x0 = x_new.flatten()
         self.paramInfo.v0 = np.zeros_like(x).flatten()
@@ -152,20 +152,21 @@ class cloth_env:
     def get_obs(self):
         observe = self.sim.getStateInfo().x
         obs = observe[self.interest1]
-        obs = np.hstack([obs, obs])
-        bar_pos = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/table_pos_60.npy")
+        # obs = np.hstack([obs, obs])
+        bar_pos = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/table_pos.npy")
         # print(bar_pos)
         obs = bar_pos - obs
         # obs = self.sim.getStateInfo().x
         return obs
 
-    def get_rew(self, obs):
-        traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_table_task_obs_30.npy", allow_pickle=True)
+    def get_rew(self, obs, action):
+        traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_table_task_30.npy", allow_pickle=True)
 
         # print(traj[self.reset_clock])
         # Include IOU and include the distance between AMP and current
         loss = 0
         rew = 0
+        # obs = torch.tensor(obs)
 
         if self.reset_clock > 110:
             obs = obs.clone().detach().numpy()
@@ -177,7 +178,33 @@ class cloth_env:
             loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
             rew = 1/loss
 
+        act_rew_1 = 1.4 - np.linalg.norm(action[:3])
+        act_rew_2 = 1.4 - np.linalg.norm(action[3:6])
+        act_rew = act_rew_1 + act_rew_2
+
+        rew = rew + (0.0025) * act_rew
+
         return rew, loss
+    # def get_rew(self, obs):
+    #     traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_table_task_obs_30.npy", allow_pickle=True)
+    #
+    #     # print(traj[self.reset_clock])
+    #     # Include IOU and include the distance between AMP and current
+    #     loss = 0
+    #     rew = 0
+    #     # obs = torch.tensor(obs)
+    #
+    #     if self.reset_clock > 110:
+    #         obs = obs.clone().detach().numpy()
+    #         loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
+    #         rew = 1/loss
+    #
+    #     if 85 > self.reset_clock > 75:
+    #         obs = obs.clone().detach().numpy()
+    #         loss = np.linalg.norm(traj[self.reset_clock] - obs[self.interest1])
+    #         rew = 1/loss
+    #
+    #     return rew, loss
 
     def step(self, action):
         """
@@ -186,7 +213,7 @@ class cloth_env:
         action = action * 0.5
 
         # Velocity Limit
-        if self.opti_step > 250000:
+        if self.reset_clock < 15:
             action_1 = action[:3]
             action_2 = action[3:]
 
@@ -216,11 +243,12 @@ class cloth_env:
         obs = self.get_obs()
         # self.example[self.reset_clock] = observe[self.interest1]
 
-        reward, loss = self.get_rew(observe)
+        reward, loss = self.get_rew(observe, action)
+        # reward, loss = self.get_rew(obs)
         info = {'loss': loss, 'succeed': terminated, 'reward': reward}
         #
         self.reset_clock = self.reset_clock + 1
-        self.opti_step = self.opti_step + 1
+        # self.opti_step = self.opti_step + 1
         if self.reset_clock == 150:
             # self.render = True
             terminated = True

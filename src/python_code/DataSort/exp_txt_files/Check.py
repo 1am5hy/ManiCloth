@@ -1,6 +1,7 @@
 import numpy as np
 
-data = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_11_3_no_2.npy", allow_pickle=True)[:, :3]/10
+data = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/exp_txt_files/hang_inference_19_3_test.npy", allow_pickle=True)[:, 3:]/10
+# print(len(data))
 
 x = data[:, 0]
 y = data[:, 1]
@@ -15,7 +16,6 @@ vel = []
 speed = []
 for i in range(len(data)-1):
     i = i + 1
-
     diff = (data[i] - data[i-1])/0.025
     vel.append(diff)
     speed.append(abs(diff))

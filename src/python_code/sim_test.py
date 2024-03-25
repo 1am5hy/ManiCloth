@@ -33,6 +33,9 @@ def get_default_scene():
     # scene.customAttachmentVertexIdx = [(0.0, [1838])]
     scene.trajectory = dfc.TrajectoryConfigs.PER_STEP_TRAJECTORY
     scene.primitiveConfig = dfc.PrimitiveConfiguration.BIG_SPHERE
+    # scene.primitiveConfig = dfc.PrimitiveConfiguration.NONE
+    # sce
+    # scene.primitive.center = dfc.Primitive.center = np.array([100, 100, 100])
     # scene.primitiveConfig = dfc.Primitive
     scene.windConfig = dfc.WindConfig.NO_WIND
     # scene.camPos = np.array([-90, 30, 60])
@@ -80,7 +83,7 @@ def get_grasp_traj(init, target, length):
     traj = init + (target - init) * np.linspace(0, 1, length)[:, None]
     return torch.tensor(traj)
 
-def upsample(marker, particle):
+def upsample(marker, particle, particle_idx):
 
     """
     Input: - the marker points
@@ -88,18 +91,18 @@ def upsample(marker, particle):
 
     Output: Point Cloud of marker points mixed into the simulation point cloud
     """
-
+    particle_idx = np.array(particle_idx)
     # particle = particle + 0.001
-    particle[:, 0] = marker[:, 0]
-    particle[:, 7] = marker[:, 1]
-    particle[:, 14] = marker[:, 2]
-    particle[:, 49] = marker[:, 3]
-    particle[:, 90] = marker[:, 4]
-    particle[:, 104] = marker[:, 5]
-    particle[:, 144] = marker[:, 6]
-    particle[:, 210] = marker[:, 7]
-    particle[:, 217] = marker[:, 8]
-    particle[:, 224] = marker[:, 9]
+    particle[:, particle_idx[0]] = marker[:, 0]
+    particle[:, particle_idx[1]] = marker[:, 1]
+    particle[:, particle_idx[2]] = marker[:, 2]
+    particle[:, particle_idx[3]] = marker[:, 3]
+    particle[:, particle_idx[4]] = marker[:, 4]
+    particle[:, particle_idx[5]] = marker[:, 5]
+    particle[:, particle_idx[6]] = marker[:, 6]
+    particle[:, particle_idx[7]] = marker[:, 7]
+    particle[:, particle_idx[8]] = marker[:, 8]
+    particle[:, particle_idx[9]] = marker[:, 9]
     # print(marker[:, 7])
     # print(particle[:, 210])
 
@@ -122,10 +125,10 @@ helper.taskInfo.dL_density = False
 
 sim_mod = pySim(sim, helper, True)
 
-def run_sim_visualize(step_num):
+def run_sim_visualize(step_num, material, demo_id, particle_idx):
     scene = get_default_scene()
 
-    scene.customAttachmentVertexIdx = [(0, [0, 7, 14, 49, 90, 104, 144, 210, 217, 224])]
+    scene.customAttachmentVertexIdx = [(0, particle_idx)]
     scene.stepNum = step_num
     sim = dfc.makeSimFromConf(scene)
 
@@ -138,7 +141,7 @@ def run_sim_visualize(step_num):
 
     # sim.resetSystem()
     paramInfo = dfc.ParamInfo()
-    x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/x_init_dyndemo.npy')
+    x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
 
     paramInfo.x0 = x.flatten()
     sim.resetSystemWithParams(helper.taskInfo, paramInfo)
@@ -146,7 +149,8 @@ def run_sim_visualize(step_num):
     state_info_init = sim.getStateInfo()
     pts = state_info_init.x.reshape(-1, 3)
 
-    position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_3.npy')
+    load_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_{}_hang_demo_{}_3.npy".format(material, demo_id)
+    position_control = np.load(load_pth)
     print(position_control.shape)
     if len(position_control) > step_num:
         position_control = position_control[:step_num]
@@ -168,7 +172,7 @@ def run_sim_visualize(step_num):
 
     return x, v
 
-def run_result(step_num):
+def run_result(step_num, material, demo_id, particle_idx):
     scene = get_default_scene()
     scene.customAttachmentVertexIdx = [(0, [0, 14])]
     scene.stepNum = step_num
@@ -187,7 +191,8 @@ def run_result(step_num):
 
     # sim.resetSystem()
     paramInfo = dfc.ParamInfo()
-    x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
+    init_load_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_{}_hang_init_{}.npy".format(material, demo_id)
+    x = np.load(init_load_pth)
 
     paramInfo.x0 = x.flatten()
     sim.resetSystemWithParams(helper.taskInfo, paramInfo)
@@ -197,7 +202,8 @@ def run_result(step_num):
     state_info_init = sim.getStateInfo()
     pts = state_info_init.x.reshape(-1, 3)
 
-    position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
+    gp_load_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_{}_hang_demo_{}.npy".format(material, demo_id)
+    position_control = np.load(gp_load_pth)
 
     if len(position_control) > step_num:
         position_control = position_control[:step_num]
@@ -213,13 +219,13 @@ def run_result(step_num):
         x_sim[i] = x[i]
         # print(x[i].shape)
 
-    # mark = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/demo/dyn_sim_obs.npy")
-    markers_traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_3.npy")
+    marker_load_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_{}_hang_demo_{}_3.npy".format(material, demo_id)
+    markers_traj = np.load(marker_load_pth)
 
     markers_traj = torch.tensor(markers_traj[:150]).float()
     x = x_sim.copy()
 
-    markers = upsample(markers_traj, x)
+    markers = upsample(markers_traj, x, particle_idx)
 
     x_sim = torch.tensor(x_sim)
     markers = torch.tensor(markers)
@@ -229,6 +235,7 @@ def run_result(step_num):
     y_marker = markers[:, 150:, 1].reshape(-1)
 
     loss = 1 * torch.nn.functional.mse_loss(markers, x_sim, reduction='sum')
+    print("The loss is:", loss)
     print(loss)
 
     # scene.customAttachmentVertexIdx = [(0, [])]
@@ -257,13 +264,13 @@ def run_result(step_num):
 
     return x, v
 
-def run_sim_target(step_num, array):
+def run_sim_target(step_num, array, particle_idx):
     # sim = dfc.makeSimFromConf(scene)
 
     scene = get_default_scene()
 
-    # scene.customAttachmentVertexIdx = [(0, [0, 7, 14, 49, 90, 104, 144, 210, 217, 224])]
-    scene.customAttachmentVertexIdx = [(0, [0, 14, 210, 224])]
+    scene.customAttachmentVertexIdx = [(0, particle_idx)]
+    # scene.customAttachmentVertexIdx = [(0, [0, 14, 210, 224])]
     scene.stepNum = step_num
     sim = dfc.makeSimFromConf(scene)
 
@@ -279,70 +286,70 @@ def run_sim_target(step_num, array):
     state_info_init = sim.getStateInfo()
     pts = state_info_init.x.reshape(-1, 3)
 
-    # target1 = array[0:3]
-    # target2 = array[3:6]
-    # target3 = array[6:9]
-    # target4 = array[9:12]
-    # target5 = array[12:15]
-    # target6 = array[15:18]
-    # target7 = array[18:21]
-    # target8 = array[21:24]
-    # target9 = array[24:27]
-    # target10 = array[27:30]
     target1 = array[0:3]
-    target3 = array[3:6]
-    target8 = array[6:9]
-    target10 = array[9:12]
+    target2 = array[3:6]
+    target3 = array[6:9]
+    target4 = array[9:12]
+    target5 = array[12:15]
+    target6 = array[15:18]
+    target7 = array[18:21]
+    target8 = array[21:24]
+    target9 = array[24:27]
+    target10 = array[27:30]
+    # target1 = array[0:3]
+    # target3 = array[3:6]
+    # target8 = array[6:9]
+    # target10 = array[9:12]
 
     gp1_id = np.array([0])
-    # gp2_id = np.array([7])
+    gp2_id = np.array([7])
     gp3_id = np.array([14])
-    # gp4_id = np.array([49])
-    # gp5_id = np.array([90])
-    # gp6_id = np.array([104])
-    # gp7_id = np.array([144])
+    gp4_id = np.array([49])
+    gp5_id = np.array([90])
+    gp6_id = np.array([104])
+    gp7_id = np.array([144])
     gp8_id = np.array([210])
-    # gp9_id = np.array([217])
+    gp9_id = np.array([217])
     gp10_id = np.array([224])
 
     grasp_point_1 = pts[gp1_id].copy()
     grasp1_traj = get_grasp_traj(grasp_point_1, target1, (step_num))
 
-    # grasp_point_2 = pts[gp2_id].copy()
-    # grasp2_traj = get_grasp_traj(grasp_point_2, target2, (step_num))
+    grasp_point_2 = pts[gp2_id].copy()
+    grasp2_traj = get_grasp_traj(grasp_point_2, target2, (step_num))
 
     grasp_point_3 = pts[gp3_id].copy()
     grasp3_traj = get_grasp_traj(grasp_point_3, target3, (step_num))
 
-    # grasp_point_4 = pts[gp4_id].copy()
-    # grasp4_traj = get_grasp_traj(grasp_point_4, target4, (step_num))
+    grasp_point_4 = pts[gp4_id].copy()
+    grasp4_traj = get_grasp_traj(grasp_point_4, target4, (step_num))
 
-    # grasp_point_5 = pts[gp5_id].copy()
-    # grasp5_traj = get_grasp_traj(grasp_point_5, target5, (step_num))
-    #
-    # grasp_point_6 = pts[gp6_id].copy()
-    # grasp6_traj = get_grasp_traj(grasp_point_6, target6, (step_num))
-    #
-    # grasp_point_7 = pts[gp7_id].copy()
-    # grasp7_traj = get_grasp_traj(grasp_point_7, target7, (step_num))
+    grasp_point_5 = pts[gp5_id].copy()
+    grasp5_traj = get_grasp_traj(grasp_point_5, target5, (step_num))
+
+    grasp_point_6 = pts[gp6_id].copy()
+    grasp6_traj = get_grasp_traj(grasp_point_6, target6, (step_num))
+
+    grasp_point_7 = pts[gp7_id].copy()
+    grasp7_traj = get_grasp_traj(grasp_point_7, target7, (step_num))
 
     grasp_point_8 = pts[gp8_id].copy()
     grasp8_traj = get_grasp_traj(grasp_point_8, target8, (step_num))
 
-    # grasp_point_9 = pts[gp9_id].copy()
-    # grasp9_traj = get_grasp_traj(grasp_point_9, target9, (step_num))
+    grasp_point_9 = pts[gp9_id].copy()
+    grasp9_traj = get_grasp_traj(grasp_point_9, target9, (step_num))
 
     grasp_point_10 = pts[gp10_id].copy()
     grasp10_traj = get_grasp_traj(grasp_point_10, target10, (step_num))
 
-    # grasp_trajs = torch.cat(
-    #     (grasp1_traj, grasp2_traj, grasp3_traj, grasp4_traj, grasp5_traj, grasp6_traj, grasp7_traj, grasp8_traj,
-    #      grasp9_traj, grasp10_traj), dim=1)
     grasp_trajs = torch.cat(
-        (grasp1_traj, grasp3_traj, grasp8_traj, grasp10_traj), dim=1)
+        (grasp1_traj, grasp2_traj, grasp3_traj, grasp4_traj, grasp5_traj, grasp6_traj, grasp7_traj, grasp8_traj,
+         grasp9_traj, grasp10_traj), dim=1)
+    # grasp_trajs = torch.cat(
+    #     (grasp1_traj, grasp3_traj, grasp8_traj, grasp10_traj), dim=1)
     empty = grasp_trajs[-1].reshape(1, -1)
 
-    for i in range(100):
+    for i in range(2000):
         grasp_trajs = torch.cat((grasp_trajs, empty), dim=0)
 
     x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), grasp_trajs,
@@ -350,22 +357,26 @@ def run_sim_target(step_num, array):
     return x, v
 
 if __name__=="__main__":
-    # target = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_30.npy")[-1]
-    # print(target)
-    #
-    # target = np.array([0, 8., 0, 0, 8, 3, 0, 6, 0, 0, 6, 3.])
-    # print(target)
-    x, v = run_result(150)
-    # x, v = run_sim_visualize(150)
-    # x, v = run_sim_target(300, target)
+    material = "cotton"
+    idx_all = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/idx_all_{}_hang.npy".format(material))
 
-    # x_traj = np.zeros([200, 225, 3])
-    #
-    # for i in range(len(x)):
-    #     x_traj[i] = x[i]
-    # np.save("x_demo", x_traj)
+    for i in range(1):
+        # demo_id = i + 1
+        demo_id = 6
+        particle_idx = idx_all[i]
 
-    # run_sim_step2(x[-1], v[-1])
-    # x = np.array(x[-1])
-    # np.save("ReleaseRL/np_files/hang_pose.npy", x)
-    # np.savetxt("x_init_dyndemo.txt", x)
+        target_load_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_{}_hang_demo_{}_30.npy".format(material, demo_id)
+        target = np.load(target_load_pth)[0]
+        # print(target)
+        #
+        # target = np.array([0, 8., 0, 0, 8, 3, 0, 6, 0, 0, 6, 3.])
+        # print(target)
+
+        x, v = run_sim_visualize(150, material, demo_id, particle_idx)
+
+        x, v = run_sim_target(500, target, particle_idx)
+        x = np.array(x[-1])
+        init_save_pth = "/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_{}_hang_init_{}.npy".format(material, demo_id)
+        np.save(init_save_pth, x)
+
+        x, v = run_result(150, material, demo_id, particle_idx)

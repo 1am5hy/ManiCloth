@@ -65,8 +65,8 @@ def pt_indentify_hang(traj):
 
     len1 = abs(particle3[2] - particle1[2])
     len2 = abs(particle1[1] - particle8[1])
-    print(len1)
-    print(len2)
+    # print(len1)
+    # print(len2)
 
     x1 = abs(particle4[2] - particle1[2])
     y1 = abs(particle1[1] - particle4[1])
@@ -97,6 +97,9 @@ def pt_indentify_hang(traj):
     id4 = int((idy4 - 1)) * 15 + idx4
 
     print("0, 7, 14, {}, {}, {}, {}, 210, 217, 224".format(id1, id2, id3, id4))
+    id_all = np.array([0, 7, 14, id1, id2, id3, id4, 210, 217, 224])
+
+    return id_all
 
 if __name__ == "__main__":
     traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_3.npy")

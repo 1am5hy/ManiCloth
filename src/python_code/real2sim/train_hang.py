@@ -10,7 +10,7 @@ from models.dataset import Dataset, MultiviewDataset
 from sim_for import SimDeform
 
 class Runner:
-    def __init__(self, conf_path, mode='train', case='CASE_NAME', is_continue=False):
+    def __init__(self, conf_path, mode='train', case='Silk', is_continue=False):
         self.device = torch.device('cuda')
 
         # Configuration
@@ -113,14 +113,14 @@ class Runner:
 
             wandb_dict = {"epoch": epoch_i}
 
-            position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_hang_task.npy')
+            position_control = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_silk_hang_task.npy')
             # position_control = position_control[:-1]
             # print(position_control.shape)
 
             if len(position_control) > 150:
                 position_control = position_control[:150]
 
-            x_init = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_hang.npy')
+            x_init = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_silk_hang_init.npy')
             x_init = x_init.reshape(-1)
             # print(x_init.shape)
             x = self.sim_deform(x_init, position_control, decay)
@@ -129,7 +129,7 @@ class Runner:
                                'Statistics/bend_stiffness': self.sim_deform.phy_params[3].item(),
                                'Statistics/density': self.sim_deform.phy_params[4].item()})
 
-            markers = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_hang_task_3.npy')
+            markers = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_silk_hang_task_3.npy')
             if len(markers) > 150:
                 markers = markers[:150]
 
@@ -202,10 +202,10 @@ class Runner:
         particle[:, 0] = marker[:, 0]
         particle[:, 7] = marker[:, 1]
         particle[:, 14] = marker[:, 2]
-        particle[:, 49] = marker[:, 3]
+        particle[:, 68] = marker[:, 3]
         particle[:, 90] = marker[:, 4]
         particle[:, 104] = marker[:, 5]
-        particle[:, 144] = marker[:, 6]
+        particle[:, 155] = marker[:, 6]
         particle[:, 210] = marker[:, 7]
         particle[:, 217] = marker[:, 8]
         particle[:, 224] = marker[:, 9]

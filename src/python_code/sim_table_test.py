@@ -121,7 +121,7 @@ sim_mod = pySim(sim, helper, True)
 def run_sim_visualize(step_num):
     scene = get_default_scene()
 
-    scene.customAttachmentVertexIdx = [(0, [0, 7, 14, 63, 120, 133, 173, 255, 262, 269])]
+    scene.customAttachmentVertexIdx = [(0, [0, 7, 14, 35, 105, 119, 189, 255, 262, 269])]
     # 0, 7, 14, 48, 120, 132, 188, 255, 262, 269
     scene.stepNum = step_num
     sim = dfc.makeSimFromConf(scene)
@@ -135,7 +135,7 @@ def run_sim_visualize(step_num):
 
     sim.resetSystem()
     paramInfo = dfc.ParamInfo()
-    x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_table.npy')
+    x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_silk_table_init.npy')
     #
     paramInfo.x0 = x.flatten()
     sim.resetSystemWithParams(helper.taskInfo, paramInfo)
@@ -144,8 +144,9 @@ def run_sim_visualize(step_num):
     state_info_init = sim.getStateInfo()
     pts = state_info_init.x.reshape(-1, 3)
 
-    position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_3.npy')
-    print(position_control[0])
+    position_control = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_silk_table_task_3.npy')
+    # position_control = position_control.reshape(-1, 10, 3)
+    # print(position_control[0])
 
     if len(position_control) > step_num:
         position_control = position_control[:step_num]
@@ -183,7 +184,7 @@ def run_result(step_num):
 
     # sim.resetSystem()
     paramInfo = dfc.ParamInfo()
-    x = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/x_init_table_task.npy')
+    x = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_silk_table_init.npy')
 
     paramInfo.x0 = x.flatten()
     sim.resetSystemWithParams(helper.taskInfo, paramInfo)
@@ -194,7 +195,7 @@ def run_result(step_num):
     pts = state_info_init.x.reshape(-1, 3)
 
     # position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/lqtcontrol/table_lqt.npy')
-    position_control = np.load('/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/gp_table_task.npy')
+    position_control = np.load('/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/gp_silk_table_task.npy')
     print(len(position_control))
 
     # if len(position_control) > step_num:
@@ -207,57 +208,57 @@ def run_result(step_num):
 
     x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos[:step_num], helper)
 
-    x_sim = np.zeros([step_num, 270, 3])
-
-    for i in range(step_num):
-        x_sim[i] = x[i]
-        # print(x[i].shape)
-
-    # mark = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/demo/dyn_sim_obs.npy")
-    markers_traj = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_3.npy")
-
-    markers_traj = torch.tensor(markers_traj[:step_num]).float()
-    x = x_sim.copy()
-
-    markers = upsample(markers_traj, x)
-
-    x_sim = torch.tensor(x_sim)
-    markers = torch.tensor(markers)
-    marker_loss = markers - x_sim
-
-    y_sim = x_sim[:, 150:, 1].reshape(-1)
-    y_marker = markers[:, 150:, 1].reshape(-1)
-    # print(max(y_sim))
-    # print(max(y_marker))
-
-
-    loss = 1 * torch.nn.functional.mse_loss(markers, x_sim, reduction='sum')
-    print(loss)
-
-    sim.resetSystem()
-    scene.customAttachmentVertexIdx = [(0, [])]
-    scene.stepNum = 150
-    sim = dfc.makeSimFromConf(scene)
-
-    sim.gradientClippingThreshold, sim.gradientClipping = 100.0, False
-    np.set_printoptions(precision=5)
-    dfc.enableOpenMP(n_threads=50)
-    sim_mod = pySim(sim, helper, True)
-
-    sim.forwardConvergenceThreshold = 1e-8
-    sim.backwardConvergenceThreshold = 5e-8
-
+    # x_sim = np.zeros([step_num, 270, 3])
+    #
+    # for i in range(step_num):
+    #     x_sim[i] = x[i]
+    #     # print(x[i].shape)
+    #
+    # # mark = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/OAMP/demo/dyn_sim_obs.npy")
+    # markers_traj = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_textured_table_task_3.npy")
+    #
+    # markers_traj = torch.tensor(markers_traj[:step_num]).float()
+    # x = x_sim.copy()
+    #
+    # markers = upsample(markers_traj, x)
+    #
+    # x_sim = torch.tensor(x_sim)
+    # markers = torch.tensor(markers)
+    # marker_loss = markers - x_sim
+    #
+    # y_sim = x_sim[:, 150:, 1].reshape(-1)
+    # y_marker = markers[:, 150:, 1].reshape(-1)
+    # # print(max(y_sim))
+    # # print(max(y_marker))
+    #
+    #
+    # loss = 1 * torch.nn.functional.mse_loss(markers, x_sim, reduction='sum')
+    # print(loss)
+    #
     # sim.resetSystem()
-    paramInfo = dfc.ParamInfo()
-    x = x[-1]
-    v = v[-1]
-    # print(v)
-    paramInfo.x0 = x.flatten()
-    paramInfo.v0 = v.flatten()
-    sim.resetSystemWithParams(helper.taskInfo, paramInfo)
-
-    print(len(db_pos))
-    x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos[:150], helper)
+    # scene.customAttachmentVertexIdx = [(0, [])]
+    # scene.stepNum = 150
+    # sim = dfc.makeSimFromConf(scene)
+    #
+    # sim.gradientClippingThreshold, sim.gradientClipping = 100.0, False
+    # np.set_printoptions(precision=5)
+    # dfc.enableOpenMP(n_threads=50)
+    # sim_mod = pySim(sim, helper, True)
+    #
+    # sim.forwardConvergenceThreshold = 1e-8
+    # sim.backwardConvergenceThreshold = 5e-8
+    #
+    # # sim.resetSystem()
+    # paramInfo = dfc.ParamInfo()
+    # x = x[-1]
+    # v = v[-1]
+    # # print(v)
+    # paramInfo.x0 = x.flatten()
+    # paramInfo.v0 = v.flatten()
+    # sim.resetSystemWithParams(helper.taskInfo, paramInfo)
+    #
+    # print(len(db_pos))
+    # x, v = stepSim(sim_mod, sim, (torch.tensor(state_info_init.x), torch.tensor(state_info_init.v)), db_pos[:150], helper)
 
     return x, v
 
@@ -346,17 +347,17 @@ def run_sim_target(step_num, array):
     return x, v
 
 if __name__=="__main__":
-    # array = np.load("/home/ubuntu/Github/DiffCloth/src/python_code/DataSort/npfiles/marker_table_task_30.npy")
-    x, v = run_result(110)
-    # x, v = run_sim_visualize(150)
+    array = np.load("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/marker_silk_table_task_30.npy")
+    x, v = run_result(200)
+    # x, v = run_sim_visualize(200)
     # x, v = run_sim_target(450, array[0])
-
+    #
     # x_traj = np.zeros([200, 225, 3])
     #
     # for i in range(len(x)):
     #     x_traj[i] = x[i]
     # np.save("x_demo", x_traj)
 
-    # run_sim_step2(x[-1], v[-1])
+    # run_sim_step2(x[-1], v[-1])`
     # x = np.array(x[-1])
-    # np.save("/home/ubuntu/Github/DiffCloth/src/python_code/ReleaseRL/np_files/table_release_pose.npy", x)
+    # np.save("/home/ubuntu/Github/ManiCloth/src/python_code/DataSort/npfiles/x_silk_table_init.npy", x)

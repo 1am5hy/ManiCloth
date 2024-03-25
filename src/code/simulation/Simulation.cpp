@@ -1996,7 +1996,7 @@ void Simulation::initScene() {
 //      veryBigSphere.mu = 0.0;
 //      veryBigSphere.discretized = true;
         rightLowerArm.center = Vec3d(0, 0, 0);
-        rightLowerArm.mu = 0.3;
+        rightLowerArm.mu = 0.1;
       break;
     }
 

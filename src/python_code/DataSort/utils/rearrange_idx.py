@@ -31,11 +31,15 @@ def rearrange(data):
     Segment based on z-axis, row by row
     """
     # for row 1 - 3
-    for j in range(2):
-        if init[0][j + 1][2] < init[0][j][2]:
-            temp = init[:, j].copy()
-            init[:, j] = init[:, j + 1].copy()
-            init[:, j + 1] = temp
+    k = 0
+    while k < 2:
+        for j in range(2):
+            if init[0][j + 1][2] < init[0][j][2]:
+                temp = init[:, j].copy()
+                init[:, j] = init[:, j + 1].copy()
+                init[:, j + 1] = temp
+
+        k = k + 1
 
     # for row 5 - 6
     if init[0][5][2] < init[0][4][2]:
@@ -43,11 +47,17 @@ def rearrange(data):
         init[:, 4] = init[:, 5].copy()
         init[:, 5] = temp
 
-    for j in range(2):
-        if init[0][j + 8][2] < init[0][j + 7][2]:
-            temp = init[:, j + 7].copy()
-            init[:, j + 7] = init[:, j + 8].copy()
-            init[:, j + 8] = temp
+    # for row 8 - 10
+    k = 0
+    while k < 2:
+        for j in range(2):
+            if init[0][j + 8][2] < init[0][j + 7][2]:
+                temp = init[:, j + 7].copy()
+                init[:, j + 7] = init[:, j + 8].copy()
+                init[:, j + 8] = temp
+
+        k = k + 1
+        # print(init[0])
 
     # print(init[0])
     new = init.reshape(-1, 30)
